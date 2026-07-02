@@ -2,7 +2,7 @@
   "name": "cursor-usage-dashboard",
   "displayName": "Cursor Usage Dashboard",
   "description": "Analyze your Cursor token usage: costs, cache savings, model breakdowns, insights, and a cost simulator — right inside Cursor.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "iair",
   "license": "MIT",
   "repository": {
@@ -48,6 +48,10 @@
       {
         "command": "cursorUsage.clearStoredCredentials",
         "title": "Cursor Usage: Clear Stored Credentials"
+      },
+      {
+        "command": "cursorUsage.showLogs",
+        "title": "Cursor Usage: Show Logs"
       }
     ],
     "configuration": {

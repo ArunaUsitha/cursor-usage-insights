@@ -28,10 +28,17 @@ export interface UsageResult {
 export class UsageService {
   private pricingCache: { markdown: string; fetchedAt: number } | null = null;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly log: (msg: string) => void = () => {},
+  ) {}
 
   async getSession(): Promise<CursorSession | null> {
-    return resolveSession(this.context);
+    const session = await resolveSession(this.context);
+    this.log(session
+      ? `Session resolved (source: ${session.source}, user: ${session.userId}${session.email ? `, email: ${session.email}` : ''})`
+      : 'No Cursor session found (state.vscdb unreadable or missing token, no manual token stored)');
+    return session;
   }
 
   async getStatus(): Promise<{ authMode: 'admin' | 'session' | 'none'; email?: string }> {

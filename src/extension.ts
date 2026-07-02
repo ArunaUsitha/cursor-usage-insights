@@ -1,17 +1,28 @@
 import * as vscode from 'vscode';
+import { setApiLogger } from './api';
 import { storeAdminApiKey, storeManualSessionToken, clearStoredCredentials } from './auth';
 import { DashboardPanel } from './panel';
 import { UsageService } from './service';
 import { UsageStatusBar } from './statusBar';
 
 export function activate(context: vscode.ExtensionContext): void {
-  const service = new UsageService(context);
+  const output = vscode.window.createOutputChannel('Cursor Usage');
+  context.subscriptions.push(output);
+  const log = (msg: string) => output.appendLine(`[${new Date().toISOString()}] ${msg}`);
+  setApiLogger(log);
+  log('Extension activated');
+
+  const service = new UsageService(context, log);
   const statusBar = new UsageStatusBar(service);
   context.subscriptions.push(statusBar);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('cursorUsage.openDashboard', () => {
       DashboardPanel.show(context, service);
+    }),
+
+    vscode.commands.registerCommand('cursorUsage.showLogs', () => {
+      output.show(true);
     }),
 
     vscode.commands.registerCommand('cursorUsage.refresh', () => {

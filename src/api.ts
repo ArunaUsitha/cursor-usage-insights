@@ -28,9 +28,28 @@ const PAGE_SIZE = 100;
 const MAX_PAGES = 500;
 const USER_AGENT = 'cursor-usage-dashboard-extension';
 
+// cursor.com rejects state-changing (POST) requests whose Origin doesn't match
+// the site ("Invalid origin for state-changing request" CSRF check), so mimic
+// the browser dashboard's headers on every cursor.com call.
+const BROWSER_HEADERS: Record<string, string> = {
+  Origin: 'https://cursor.com',
+  Referer: 'https://cursor.com/dashboard',
+  'User-Agent': USER_AGENT,
+};
+
+type LogFn = (message: string) => void;
+let log: LogFn = () => {};
+
+/** Install a logger (e.g. a VS Code output channel) for request tracing. */
+export function setApiLogger(fn: LogFn): void {
+  log = fn;
+}
+
 async function fetchJson(url: string, options: RequestInit, timeoutMs = 20000): Promise<any> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const started = Date.now();
+  const method = options.method || 'GET';
   try {
     const res = await fetch(url, { ...options, signal: controller.signal });
     const text = await res.text();
@@ -41,11 +60,14 @@ async function fetchJson(url: string, options: RequestInit, timeoutMs = 20000): 
       data = { raw: text };
     }
     if (!res.ok) {
+      log(`${method} ${url} -> HTTP ${res.status} in ${Date.now() - started}ms: ${text.slice(0, 300)}`);
       throw new ApiError(data?.message || data?.error || `HTTP ${res.status}`, res.status);
     }
+    log(`${method} ${url} -> ${res.status} in ${Date.now() - started}ms`);
     return data;
   } catch (e: any) {
     if (e instanceof ApiError) throw e;
+    log(`${method} ${url} -> ${e?.name === 'AbortError' ? 'timeout' : e?.message} in ${Date.now() - started}ms`);
     if (e?.name === 'AbortError') throw new ApiError(`Request timed out: ${url}`);
     throw new ApiError(e?.message || String(e));
   } finally {
@@ -112,8 +134,8 @@ export async function fetchDashboardUsage(
     const data = await fetchJson('https://cursor.com/api/dashboard/get-filtered-usage-events', {
       method: 'POST',
       headers: {
+        ...BROWSER_HEADERS,
         'Content-Type': 'application/json',
-        'User-Agent': USER_AGENT,
         Cookie: `WorkosCursorSessionToken=${session.cookieValue}`,
       },
       body: JSON.stringify({
@@ -174,7 +196,7 @@ export async function fetchMe(session: CursorSession): Promise<{ email?: string;
   const data = await fetchJson('https://cursor.com/api/auth/me', {
     method: 'GET',
     headers: {
-      'User-Agent': USER_AGENT,
+      ...BROWSER_HEADERS,
       Cookie: `WorkosCursorSessionToken=${session.cookieValue}`,
     },
   });
@@ -187,7 +209,7 @@ export async function fetchPricingMarkdown(): Promise<string> {
   const timer = setTimeout(() => controller.abort(), 20000);
   try {
     const res = await fetch('https://cursor.com/docs/models-and-pricing.md', {
-      headers: { 'User-Agent': USER_AGENT },
+      headers: BROWSER_HEADERS,
       signal: controller.signal,
     });
     if (!res.ok) throw new ApiError(`Pricing fetch failed: HTTP ${res.status}`, res.status);
