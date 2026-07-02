@@ -1,0 +1,65 @@
+import * as vscode from 'vscode';
+import { storeAdminApiKey, storeManualSessionToken, clearStoredCredentials } from './auth';
+import { DashboardPanel } from './panel';
+import { UsageService } from './service';
+import { UsageStatusBar } from './statusBar';
+
+export function activate(context: vscode.ExtensionContext): void {
+  const service = new UsageService(context);
+  const statusBar = new UsageStatusBar(service);
+  context.subscriptions.push(statusBar);
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('cursorUsage.openDashboard', () => {
+      DashboardPanel.show(context, service);
+    }),
+
+    vscode.commands.registerCommand('cursorUsage.refresh', () => {
+      DashboardPanel.refresh();
+      void statusBar.refresh();
+    }),
+
+    vscode.commands.registerCommand('cursorUsage.setSessionToken', async () => {
+      const input = await vscode.window.showInputBox({
+        title: 'Cursor session token',
+        prompt:
+          'Paste the WorkosCursorSessionToken cookie value from cursor.com (DevTools → Application → Cookies). Stored securely in VS Code SecretStorage.',
+        password: true,
+        ignoreFocusOut: true,
+      });
+      if (!input) return;
+      if (await storeManualSessionToken(context, input)) {
+        void vscode.window.showInformationMessage('Cursor Usage: session token saved.');
+        DashboardPanel.refresh();
+        void statusBar.refresh();
+      } else {
+        void vscode.window.showErrorMessage(
+          'Cursor Usage: could not parse that token. Paste the full cookie value (it contains "%3A%3A" or "::").',
+        );
+      }
+    }),
+
+    vscode.commands.registerCommand('cursorUsage.setAdminApiKey', async () => {
+      const input = await vscode.window.showInputBox({
+        title: 'Cursor Team Admin API key',
+        prompt: 'Requires a Cursor Teams/Business plan. Stored securely in VS Code SecretStorage.',
+        password: true,
+        ignoreFocusOut: true,
+      });
+      if (!input?.trim()) return;
+      await storeAdminApiKey(context, input);
+      void vscode.window.showInformationMessage('Cursor Usage: Admin API key saved. Team usage will be used.');
+      DashboardPanel.refresh();
+      void statusBar.refresh();
+    }),
+
+    vscode.commands.registerCommand('cursorUsage.clearStoredCredentials', async () => {
+      await clearStoredCredentials(context);
+      void vscode.window.showInformationMessage('Cursor Usage: stored credentials cleared.');
+      DashboardPanel.refresh();
+      void statusBar.refresh();
+    }),
+  );
+}
+
+export function deactivate(): void {}
