@@ -145,6 +145,21 @@ test('summarize totals costs, fees, and savings', () => {
   assert.equal(s.billingMode, 'mixed');
   assert.equal(s.hasUsageFees, true);
 });
+test('billedCost: included/errored kinds are 0, charges bill, free plan forces 0', () => {
+  const included = normalize({ ...tokenBasedRaw, kind: 'Included in Pro' }, pricing);
+  assert.equal(included.billedCost, 0);
+  const errored = normalize({ ...tokenBasedRaw, kind: 'Errored, Not Charged' }, pricing);
+  assert.equal(errored.billedCost, 0);
+  const charged = normalize(tokenBasedRaw, pricing);
+  assert.equal(charged.billedCost, 1.23);
+  const usageFee = normalize(usageBasedRaw, pricing);
+  assert.equal(usageFee.billedCost, 0.04);
+  const free = normalize(tokenBasedRaw, pricing, { freePlan: true });
+  assert.equal(free.billedCost, 0);
+  assert.equal(free.valueCost, free.cost);
+  const unknown = normalize({ model: 'x', tokenUsage: { totalCents: 10 } }, pricing);
+  assert.equal(unknown.billedCost, null);
+});
 test('percentile', () => {
   assert.equal(percentile([1, 2, 3, 4], 0.75), 4);
   assert.equal(percentile([], 0.75), null);

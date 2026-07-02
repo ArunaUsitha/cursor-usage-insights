@@ -6,17 +6,20 @@ import {
 } from './auth';
 import {
   ApiError,
+  PlanInfo,
   RawUsageEvent,
   fetchAdminUsage,
   fetchDashboardUsage,
   fetchMe,
   fetchPricingMarkdown,
+  fetchStripeProfile,
 } from './api';
 
 export interface UsageResult {
   events: RawUsageEvent[];
   authMode: 'admin' | 'session' | 'none';
   email?: string;
+  plan?: PlanInfo;
   note?: string;
 }
 
@@ -57,7 +60,14 @@ export class UsageService {
 
     const session = await this.getSession();
     if (session) {
-      const events = await fetchDashboardUsage(session, startMs, endMs);
+      const [events, plan] = await Promise.all([
+        fetchDashboardUsage(session, startMs, endMs),
+        fetchStripeProfile(session).catch((e) => {
+          this.log(`Plan lookup failed (non-fatal): ${e?.message || e}`);
+          return undefined;
+        }),
+      ]);
+      if (plan) this.log(`Plan: ${plan.membershipType}`);
       let email = session.email;
       if (!email) {
         try {
@@ -70,6 +80,7 @@ export class UsageService {
         events,
         authMode: 'session',
         email,
+        plan,
         note:
           session.source === 'ide'
             ? 'Signed in with your Cursor IDE session.'

@@ -191,6 +191,29 @@ export async function fetchAdminUsage(
   return events;
 }
 
+export interface PlanInfo {
+  /** e.g. 'free', 'free_trial', 'pro', 'business', 'enterprise', 'unknown' */
+  membershipType: string;
+  daysRemainingOnTrial?: number | null;
+}
+
+/** Account plan/membership via the same endpoint the cursor.com dashboard uses. */
+export async function fetchStripeProfile(session: CursorSession): Promise<PlanInfo> {
+  const data = await fetchJson('https://cursor.com/api/auth/stripe', {
+    method: 'GET',
+    headers: {
+      ...BROWSER_HEADERS,
+      Cookie: `WorkosCursorSessionToken=${session.cookieValue}`,
+    },
+  });
+  return {
+    membershipType: String(
+      data?.membershipType ?? data?.individualMembershipType ?? 'unknown',
+    ).toLowerCase(),
+    daysRemainingOnTrial: num(data?.daysRemainingOnTrial),
+  };
+}
+
 /** Validates the session and returns account info. */
 export async function fetchMe(session: CursorSession): Promise<{ email?: string; name?: string }> {
   const data = await fetchJson('https://cursor.com/api/auth/me', {

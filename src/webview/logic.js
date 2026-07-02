@@ -140,7 +140,11 @@ export function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-export function normalize(raw, pricing) {
+/**
+ * opts.freePlan: on a free plan nothing is ever billed, so billedCost is 0
+ * regardless of what the event's charge fields claim.
+ */
+export function normalize(raw, pricing, opts = {}) {
   const tu = raw.tokenUsage || {};
   const inputTokens = num(tu.inputTokens);
   const outputTokens = num(tu.outputTokens);
@@ -167,6 +171,18 @@ export function normalize(raw, pricing) {
     cost = chargedCents / 100;
   }
 
+  // billedCost = what the user actually pays for this request on their plan,
+  // as opposed to `cost` which is the API-equivalent value of the tokens.
+  const kindL = String(raw.kind || '').toLowerCase();
+  let billedCost = null;
+  if (opts.freePlan) {
+    billedCost = 0;
+  } else if (/included|free|not charged|no charge|errored/.test(kindL)) {
+    billedCost = 0;
+  } else if (chargedCents != null) {
+    billedCost = chargedCents / 100;
+  }
+
   let ts = num(raw.timestamp);
   if (ts > 0 && ts < 1e12) ts *= 1000;
 
@@ -180,7 +196,10 @@ export function normalize(raw, pricing) {
     timestampMs: ts || 0,
     modelRaw,
     model: displayModel(modelRaw),
+    kind: raw.kind || null,
     cost,
+    valueCost: cost,
+    billedCost,
     tokenCost,
     requestCharge,
     isTokenBased,

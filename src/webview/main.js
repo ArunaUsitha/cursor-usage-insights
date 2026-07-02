@@ -95,6 +95,8 @@ const state = {
   charts: {},
   chartsReady: false,
   datePreset: '30d',
+  costMode: 'value', // 'value' (what-if API-equivalent) | 'billed' (actual charges)
+  plan: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -118,6 +120,7 @@ function esc(s) {
 }
 
 const STORAGE_KEY = 'cursorUsageDashboardPrefs';
+const COST_MODE_KEY = 'cursorUsageDashboardCostMode';
 const COMPARE_MODELS_KEY = 'cursorUsageDashboardCompareModels';
 const ANALYZE_PREFS_KEY = 'cursorUsageDashboardAnalyzePrefs';
 
@@ -134,6 +137,46 @@ function chartMuted() { return themeColor('--vscode-descriptionForeground', '#64
 function chartGrid() { return themeColor('--vscode-editorWidget-border', 'rgba(128,128,128,0.2)'); }
 function chartTooltipBg() { return themeColor('--vscode-editorWidget-background', '#1e293b'); }
 function chartTooltipFg() { return themeColor('--vscode-editorWidget-foreground', '#f8fafc'); }
+
+// ---------------------------------------------------------------------------
+// Plan & cost mode
+// ---------------------------------------------------------------------------
+
+function isFreePlan() {
+  return Boolean(state.plan?.membershipType?.startsWith('free'));
+}
+
+function planLabel() {
+  const t = state.plan?.membershipType;
+  if (!t || t === 'unknown') return null;
+  const labels = {
+    free: 'Free plan',
+    free_trial: 'Pro trial',
+    pro: 'Pro plan',
+    pro_plus: 'Pro+ plan',
+    ultra: 'Ultra plan',
+    business: 'Business plan',
+    enterprise: 'Enterprise plan',
+  };
+  return labels[t] || `${t} plan`;
+}
+
+/** Events re-mapped so `cost` reflects the active cost mode. */
+function applyCostMode(events) {
+  if (state.costMode !== 'billed') return events;
+  return events.map((e) => ({ ...e, cost: e.billedCost }));
+}
+
+function setCostMode(mode) {
+  state.costMode = mode;
+  storage.setItem(COST_MODE_KEY, mode);
+  document.querySelectorAll('.cost-mode-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.costMode === mode);
+  });
+  state.page = 1;
+  destroyCharts();
+  refresh();
+}
 
 // ---------------------------------------------------------------------------
 // Date range presets & persistence
@@ -579,15 +622,27 @@ function renderKpis(summary) {
   const isFiltered = summary.count < state.all.length;
 
   $('kpiRequests').textContent = fmt.num(summary.count);
-  $('kpiRequestsSub').innerHTML = `Est. without cache: ${fmt.money(summary.noCache)} ${tip('What token cost would have been if every cache-read token was billed at full input-token price instead of the discounted cache-read rate.')}`;
+  const noCacheEst = summary.costMode === 'billed'
+    ? summary.valueTotal + summary.totalSavings
+    : summary.noCache;
+  $('kpiRequestsSub').innerHTML = `Est. without cache: ${fmt.money(noCacheEst)} ${tip('What the token value would have been if every cache-read token was billed at full input-token price instead of the discounted cache-read rate. Always based on what-if pricing.')}`;
   if (isFiltered) {
     $('kpiRequestsSub').innerHTML += `<br><span class="kpi-muted">Filtered from ${fmt.num(state.all.length)} total</span>`;
   }
 
   $('kpiTotalCost').textContent = fmt.money(summary.totalCost);
-  let costSub = summary.billingMode === 'token'
-    ? `Total billed (token-based plan)`
-    : `Model/API token charges only`;
+  const labelEl = $('kpiCostLabelText');
+  let costSub;
+  if (summary.costMode === 'billed') {
+    if (labelEl) labelEl.textContent = 'Billed cost';
+    costSub = `What-if token value: ${fmt.money(summary.valueTotal)}`;
+  } else {
+    if (labelEl) labelEl.textContent = isFreePlan() ? 'Token cost (what-if)' : 'Token cost';
+    costSub = summary.billingMode === 'token'
+      ? `Total billed (token-based plan)`
+      : `Model/API token charges only`;
+    if (summary.billedKnown) costSub += ` · actually billed: ${fmt.money(summary.billedTotal)}`;
+  }
   costSub += ` · ${fmt.num(summary.withCost)} requests`;
   $('kpiCostSub').textContent = costSub;
 
@@ -602,7 +657,7 @@ function renderKpis(summary) {
   }
 
   $('kpiSavings').textContent = fmt.money(summary.totalSavings);
-  const savingsPct = summary.noCache > 0 ? (summary.totalSavings / summary.noCache) * 100 : null;
+  const savingsPct = noCacheEst > 0 ? (summary.totalSavings / noCacheEst) * 100 : null;
   $('kpiSavingsSub').innerHTML = savingsPct != null
     ? `${fmt.pct(savingsPct)} of est. cost without cache ${tip('Share of the no-cache estimate that cache discounted reads saved you.')}`
     : '—';
@@ -620,7 +675,10 @@ function renderKpis(summary) {
       mixed: 'This date range spans a <strong>plan change</strong>: older requests use usage-based fees ($0.04/request + token cost), newer ones use token-based billing. Each row is labeled automatically.',
       unknown: 'Cost data is shown per request. Check the Cost column and token breakdown for details.',
     };
-    billingEl.innerHTML = `${messages[summary.billingMode] || messages.unknown} Cache savings use each request's model pricing from <a href="https://cursor.com/docs/models-and-pricing">Cursor docs</a> (Auto requests use Auto rates). Compare with the <a href="https://cursor.com/dashboard/usage">official dashboard</a>.`;
+    const planNote = isFreePlan()
+      ? `You're on the <strong>${esc(planLabel() || 'Free plan')}</strong> — requests are <strong>not actually billed</strong>; costs shown in What-if mode are the API-equivalent value of your tokens. `
+      : (planLabel() ? `Plan: <strong>${esc(planLabel())}</strong>. ` : '');
+    billingEl.innerHTML = `${planNote}${messages[summary.billingMode] || messages.unknown} Cache savings use each request's model pricing from <a href="https://cursor.com/docs/models-and-pricing">Cursor docs</a> (Auto requests use Auto rates). Compare with the <a href="https://cursor.com/dashboard/usage">official dashboard</a>.`;
     billingEl.classList.remove('hidden');
   }
 }
@@ -701,8 +759,13 @@ function setPanel(panel) {
 }
 
 function refresh() {
-  state.filtered = sortEvents(applyFilters(state.all));
+  const baseEvents = applyFilters(state.all);
+  state.filtered = sortEvents(applyCostMode(baseEvents));
   const summary = summarize(state.filtered);
+  summary.costMode = state.costMode;
+  summary.valueTotal = baseEvents.reduce((s, e) => s + (e.valueCost ?? 0), 0);
+  summary.billedTotal = baseEvents.reduce((s, e) => s + (e.billedCost ?? 0), 0);
+  summary.billedKnown = baseEvents.some((e) => e.billedCost != null);
   updateFilterSummary();
   renderKpis(summary);
 
@@ -744,7 +807,9 @@ async function load() {
     ]);
 
     state.pricing = parsePricing(pricingData.markdown || '');
-    state.all = (usage.events || []).map((raw) => normalize(raw, state.pricing));
+    state.plan = usage.plan || null;
+    const normOpts = { freePlan: isFreePlan() };
+    state.all = (usage.events || []).map((raw) => normalize(raw, state.pricing, normOpts));
     state.page = 1;
     destroyCharts();
 
@@ -762,7 +827,11 @@ async function load() {
     populateSimulatorModels();
     populateSimRequestPicker(state.simRequestId);
     if (state.appView === 'usage') $('usageView').classList.remove('hidden');
-    showAlert('info', `Loaded ${state.all.length} requests${usage.email ? ` for ${usage.email}` : ''}.`);
+    if (usage.email || planLabel()) {
+      $('authLabel').textContent = [usage.email ? `Signed in as ${usage.email}` : null, planLabel()]
+        .filter(Boolean).join(' — ');
+    }
+    showAlert('info', `Loaded ${state.all.length} requests${usage.email ? ` for ${usage.email}` : ''}${planLabel() ? ` (${planLabel()})` : ''}.`);
     refresh();
     if (state.appView === 'simulator') refreshSimulator();
     if (state.appView === 'analyze') renderAnalyze();
@@ -776,12 +845,13 @@ async function load() {
 }
 
 function exportCsv() {
-  const headers = ['time', 'model', 'modelRaw', 'tokenCost', 'usageFee', 'cacheSavings', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens', 'totalTokens'];
+  const headers = ['time', 'model', 'modelRaw', 'whatIfCost', 'billedCost', 'usageFee', 'cacheSavings', 'inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens', 'totalTokens'];
   const rows = state.filtered.map((e) => [
     new Date(e.timestampMs).toISOString(),
     e.model,
     e.modelRaw,
-    e.cost ?? '',
+    e.valueCost ?? '',
+    e.billedCost ?? '',
     e.requestCharge ?? '',
     e.cacheSavings ?? '',
     e.inputTokens,
@@ -1135,6 +1205,7 @@ function buildBriefSectionSummary(data, events) {
     `- Cache savings (est.): ${fmt.money(summary.totalSavings)}`,
     `- Billing: ${summary.billingMode}`,
   ];
+  if (planLabel()) lines.push(`- Plan: ${planLabel()}${isFreePlan() ? ' (costs are what-if API-equivalent values, nothing actually billed)' : ''}`);
   if (summary.hasUsageFees) lines.push(`- Usage fees (flat): ${fmt.money(summary.totalRequestFees)}`);
   const modelFilter = $('modelFilter').value;
   if (modelFilter) lines.push(`- Model filter: ${displayModel(modelFilter)}`);
@@ -1703,6 +1774,18 @@ function setAppView(view) {
 async function init() {
   initDateRange();
   initCompareModelPrefs();
+
+  const storedMode = storage.getItem(COST_MODE_KEY);
+  if (storedMode === 'billed' || storedMode === 'value') {
+    state.costMode = storedMode;
+    document.querySelectorAll('.cost-mode-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.costMode === storedMode);
+    });
+  }
+
+  document.querySelectorAll('.cost-mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setCostMode(btn.dataset.costMode));
+  });
 
   try {
     const status = await rpc('status');

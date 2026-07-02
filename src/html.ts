@@ -74,6 +74,11 @@ export function getDashboardHtml(webview: vscode.Webview, extensionUri: vscode.U
         </div>
         <div class="filter-actions">
           <span id="filterSummary" class="filter-summary"></span>
+          <div class="date-presets" role="group" aria-label="Cost mode" id="costModeToggle">
+            <span class="presets-label">Costs <span class="tip" tabindex="0" data-tip="What-if: the API-equivalent value of your tokens (what they would cost if billed at published rates) — best for optimizing. Billed: what your plan actually charged.">ⓘ</span></span>
+            <button type="button" class="preset-btn cost-mode-btn active" data-cost-mode="value">What-if</button>
+            <button type="button" class="preset-btn cost-mode-btn" data-cost-mode="billed">Billed</button>
+          </div>
           <button id="refreshBtn" class="btn primary">Refresh</button>
           <button id="exportBtn" class="btn">Export CSV</button>
         </div>
@@ -92,7 +97,7 @@ export function getDashboardHtml(webview: vscode.Webview, extensionUri: vscode.U
           <span class="kpi-sub" id="kpiRequestsSub"></span>
         </article>
         <article class="kpi kpi-primary">
-          <span class="kpi-label">Token cost <span class="tip" tabindex="0" data-tip="Sum of model/API token charges from Cursor (input + output + cache tokens). Does not include flat usage fees on some plans.">ⓘ</span></span>
+          <span class="kpi-label"><span id="kpiCostLabelText">Token cost</span> <span class="tip" tabindex="0" data-tip="Sum of model/API token charges from Cursor (input + output + cache tokens). Does not include flat usage fees on some plans. Use the Costs toggle to switch between what-if value and actually billed amounts.">ⓘ</span></span>
           <span class="kpi-value" id="kpiTotalCost">—</span>
           <span class="kpi-sub" id="kpiCostSub"></span>
           <span class="kpi-sub kpi-fees hidden" id="kpiCostFees"></span>

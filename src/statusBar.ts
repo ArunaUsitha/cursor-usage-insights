@@ -59,12 +59,14 @@ export class UsageStatusBar {
       }
 
       const cost = sumTokenCostDollars(result.events);
-      this.item.text = `$(graph) $${cost.toFixed(2)}`;
+      const freePlan = result.plan?.membershipType?.startsWith('free') ?? false;
+      this.item.text = `$(graph) ${freePlan ? '~' : ''}$${cost.toFixed(2)}`;
 
       const tooltip = new vscode.MarkdownString(undefined, true);
       tooltip.appendMarkdown(`**Cursor Usage** — last ${periodDays} days\n\n`);
-      tooltip.appendMarkdown(`- Token cost: **$${cost.toFixed(2)}**\n`);
+      tooltip.appendMarkdown(`- Token ${freePlan ? 'value (what-if, not billed)' : 'cost'}: **$${cost.toFixed(2)}**\n`);
       tooltip.appendMarkdown(`- Requests: **${result.events.length.toLocaleString('en-US')}**\n`);
+      if (result.plan?.membershipType) tooltip.appendMarkdown(`- Plan: ${result.plan.membershipType}\n`);
       if (result.email) tooltip.appendMarkdown(`- Account: ${result.email}\n`);
       tooltip.appendMarkdown(`\n_Click to open the dashboard._`);
       this.item.tooltip = tooltip;
