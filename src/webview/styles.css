@@ -193,6 +193,82 @@ input:focus, select:focus, textarea:focus {
 
 .loading { color: var(--muted); padding: 24px 0; text-align: center; }
 
+/* --------------------------------------------------------------- plan/cycle */
+
+.plan-cycle {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin: 12px 0;
+}
+.plan-cycle.plan-cycle-warning { border-left-color: var(--amber); }
+.plan-cycle.plan-cycle-critical { border-left-color: var(--red); }
+
+.plan-cycle-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.plan-cycle-eyebrow {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+.plan-cycle-identity h2 {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.plan-cycle-reset {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.plan-cycle-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.plan-cycle-bar-track {
+  flex: 1;
+  height: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.plan-cycle-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  width: 0%;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+.plan-cycle.plan-cycle-warning .plan-cycle-bar-fill { background: var(--amber); }
+.plan-cycle.plan-cycle-critical .plan-cycle-bar-fill { background: var(--red); }
+.plan-cycle-bar-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-cycle-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
 /* ------------------------------------------------------------------- KPIs */
 
 .kpi-strip {

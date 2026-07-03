@@ -173,45 +173,84 @@ function planLabel() {
   return labels[t] || `${t} plan`;
 }
 
-/** Renders the plan-usage KPI card, or hides it if no quota data was returned. */
-function renderQuota(quota, hardLimit) {
-  const card = $('kpiQuotaCard');
+// Mirrors the status bar's default warn/critical thresholds (cursorUsage.statusBar.warnAtPercent/
+// criticalAtPercent) — the webview has no direct access to those settings, so this uses the same defaults.
+const PLAN_CYCLE_WARN_PCT = 80;
+const PLAN_CYCLE_CRITICAL_PCT = 95;
+
+/**
+ * Renders the prominent Plan & cycle panel at the top of the dashboard, or
+ * hides it entirely if Cursor returned nothing usable for this account.
+ *
+ * Three honest states, not one generic "quota" number:
+ *  - a real fixed request limit was found -> progress bar + %.
+ *  - a plan is known but no fixed limit was found -> explain why (most
+ *    Auto/token-metered usage isn't tracked by this legacy endpoint) instead
+ *    of showing a bare "0" that reads as broken.
+ *  - nothing at all -> hide the panel; the rest of the dashboard still works.
+ */
+function renderPlanCycle(quota, hardLimit) {
+  const card = $('planCycleCard');
   if (!card) return;
-  if (!quota || quota.used == null) {
+
+  const label = planLabel();
+  if (!label && !quota) {
     card.classList.add('hidden');
     return;
   }
   card.classList.remove('hidden');
-  const unlimited = quota.limit == null || quota.limit <= 0;
-  $('kpiQuota').textContent = unlimited ? fmt.num(quota.used) : `${fmt.num(quota.used)} / ${fmt.num(quota.limit)}`;
+  card.classList.remove('plan-cycle-warning', 'plan-cycle-critical');
+  $('planCycleName').textContent = label || 'Unknown plan';
 
-  const subParts = [];
-  if (unlimited) {
-    subParts.push('Included requests this cycle · no fixed limit found');
-  } else {
-    const pct = (quota.used / quota.limit) * 100;
-    subParts.push(`${fmt.pct(pct)} of this cycle's included requests`);
-  }
-  if (quota.resetIso) {
+  const resetEl = $('planCycleReset');
+  if (quota?.resetIso) {
     const resetDate = new Date(quota.resetIso);
-    if (!Number.isNaN(resetDate.getTime())) {
-      subParts.push(`Resets ${resetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`);
-    }
+    resetEl.textContent = Number.isNaN(resetDate.getTime())
+      ? ''
+      : `Resets ${resetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  } else {
+    resetEl.textContent = '';
   }
-  if (!unlimited && quota.startOfCycleIso) {
-    const sinceMs = new Date(quota.startOfCycleIso).getTime();
-    if (!Number.isNaN(sinceMs)) {
-      const exhaustion = projectExhaustionDate(quota.used, quota.limit, sinceMs);
-      if (exhaustion) {
-        const days = Math.max(0, Math.round((exhaustion.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
-        subParts.push(days <= 0
-          ? 'At this pace: already used up this cycle'
-          : `At this pace: ~${days}d left`);
+
+  const barRow = $('planCycleBarRow');
+  const noteEl = $('planCycleNote');
+  const hasLimit = quota && quota.limit != null && quota.limit > 0 && quota.used != null;
+
+  if (hasLimit) {
+    const pct = Math.min(100, (quota.used / quota.limit) * 100);
+    barRow.classList.remove('hidden');
+    $('planCycleBarFill').style.width = `${pct}%`;
+    $('planCycleBarLabel').textContent = `${fmt.num(quota.used)} / ${fmt.num(quota.limit)} (${fmt.pct(pct)})`;
+    if (pct >= PLAN_CYCLE_CRITICAL_PCT) card.classList.add('plan-cycle-critical');
+    else if (pct >= PLAN_CYCLE_WARN_PCT) card.classList.add('plan-cycle-warning');
+
+    const notes = [];
+    if (quota.startOfCycleIso) {
+      const sinceMs = new Date(quota.startOfCycleIso).getTime();
+      if (!Number.isNaN(sinceMs)) {
+        const exhaustion = projectExhaustionDate(quota.used, quota.limit, sinceMs);
+        if (exhaustion) {
+          const days = Math.max(0, Math.round((exhaustion.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+          notes.push(days <= 0
+            ? 'At this pace, you’ve already used this cycle’s included requests.'
+            : `At this pace: ~${days} day${days === 1 ? '' : 's'} until included requests run out.`);
+        }
       }
     }
+    if (hardLimit) notes.push(`Usage-based spend cap: $${hardLimit.toFixed(2)}/mo.`);
+    noteEl.textContent = notes.join(' ');
+  } else {
+    barRow.classList.add('hidden');
+    const notes = [];
+    if (quota) {
+      notes.push(
+        'No fixed request quota found for this plan — usage like Auto is metered by token cost '
+        + '(see the cards below), not a request count. This is expected for most current plans, not a bug.',
+      );
+    }
+    if (hardLimit) notes.push(`Usage-based spend cap: $${hardLimit.toFixed(2)}/mo.`);
+    noteEl.textContent = notes.join(' ');
   }
-  if (hardLimit) subParts.push(`Spend cap $${hardLimit.toFixed(2)}/mo`);
-  $('kpiQuotaSub').textContent = subParts.join(' · ');
 }
 
 /** Events re-mapped so `cost` reflects the active cost mode. */
@@ -918,7 +957,7 @@ async function load() {
     state.all = (usage.events || []).map((raw) => normalize(raw, state.pricing, normOpts));
     state.page = 1;
     destroyCharts();
-    renderQuota(usage.quota, usage.hardLimit);
+    renderPlanCycle(usage.quota, usage.hardLimit);
 
     if (usage.authMode === 'none') {
       showAlert('warn', 'Not signed in. Open Cursor while logged into your account, or run "Cursor Usage: Set Session Token Manually" from the command palette.');

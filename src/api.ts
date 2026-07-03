@@ -275,7 +275,13 @@ export async function fetchPlanQuota(session: CursorSession): Promise<PlanQuota 
       },
     },
   );
-  return parseQuotaResponse(data);
+  // This endpoint's shape is undocumented and guessed at — log the raw body
+  // (once per call, capped) so a mismatch can be diagnosed from Show Logs
+  // instead of guessed at blind.
+  log(`Quota raw response: ${JSON.stringify(data).slice(0, 800)}`);
+  const parsed = parseQuotaResponse(data);
+  log(`Quota parsed: ${parsed ? JSON.stringify(parsed) : 'null (no recognizable bucket found)'}`);
+  return parsed;
 }
 
 /** Usage-based spending hard limit in dollars (0/null when unset — undocumented endpoint, best-effort). */
@@ -289,6 +295,7 @@ export async function fetchHardLimit(session: CursorSession): Promise<number | n
     },
     body: '{}',
   });
+  log(`Hard-limit raw response: ${JSON.stringify(data).slice(0, 300)}`);
   const limit = num(data?.hardLimit);
   return limit != null && limit > 0 ? limit : null;
 }

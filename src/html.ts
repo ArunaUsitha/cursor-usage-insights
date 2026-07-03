@@ -89,6 +89,21 @@ export function getDashboardHtml(webview: vscode.Webview, extensionUri: vscode.U
     <div id="billingNotice" class="alert info hidden"></div>
     <div id="loading" class="loading hidden">Loading usage…</div>
 
+    <section id="planCycleCard" class="plan-cycle hidden" aria-label="Plan and billing cycle">
+      <div class="plan-cycle-top">
+        <div class="plan-cycle-identity">
+          <span class="plan-cycle-eyebrow">Your plan</span>
+          <h2 id="planCycleName">—</h2>
+        </div>
+        <div class="plan-cycle-reset" id="planCycleReset"></div>
+      </div>
+      <div class="plan-cycle-bar-row hidden" id="planCycleBarRow">
+        <div class="plan-cycle-bar-track"><div class="plan-cycle-bar-fill" id="planCycleBarFill"></div></div>
+        <span class="plan-cycle-bar-label" id="planCycleBarLabel"></span>
+      </div>
+      <p class="plan-cycle-note" id="planCycleNote"></p>
+    </section>
+
     <main id="usageView" class="hidden">
       <section class="kpi-strip" aria-label="Summary">
         <article class="kpi">
@@ -111,11 +126,6 @@ export function getDashboardHtml(webview: vscode.Webview, extensionUri: vscode.U
           <span class="kpi-label">Avg token cost / request <span class="tip" tabindex="0" data-tip="Average token/API cost per request (with cache). Subtext shows average if cache-read tokens were billed as full input.">ⓘ</span></span>
           <span class="kpi-value" id="kpiAvg">—</span>
           <span class="kpi-sub" id="kpiAvgSub"></span>
-        </article>
-        <article class="kpi hidden" id="kpiQuotaCard">
-          <span class="kpi-label">Plan usage <span class="tip" tabindex="0" data-tip="Included/premium requests used this billing cycle, from Cursor's account usage. Best-effort — hidden if this data isn't available for your plan.">ⓘ</span></span>
-          <span class="kpi-value" id="kpiQuota">—</span>
-          <span class="kpi-sub" id="kpiQuotaSub"></span>
         </article>
       </section>
 

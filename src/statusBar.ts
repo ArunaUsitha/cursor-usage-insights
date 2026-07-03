@@ -131,7 +131,9 @@ export class UsageStatusBar {
           }
         }
       } else if (quota) {
-        tooltip.appendMarkdown(`- Plan usage: **${quota.used.toLocaleString('en-US')}** requests this cycle (no fixed limit found)\n`);
+        tooltip.appendMarkdown(
+          `- No fixed request quota found for this plan — usage like Auto is metered by token cost above, not a request count\n`,
+        );
       }
       if (result.hardLimit) {
         tooltip.appendMarkdown(`- Spend cap: **$${result.hardLimit.toFixed(2)}**/mo (see dashboard for cycle-to-date billed total)\n`);
