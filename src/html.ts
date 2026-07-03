@@ -42,7 +42,8 @@ export function getDashboardHtml(webview: vscode.Webview, extensionUri: vscode.U
           </p>
         </div>
         <nav class="app-nav" aria-label="Main">
-          <button type="button" class="nav-item active" data-app="usage">Usage</button>
+          <button type="button" class="nav-item active" data-app="overview">Overview</button>
+          <button type="button" class="nav-item" data-app="usage">Requests</button>
           <button type="button" class="nav-item" data-app="analyze">Analyze</button>
           <button type="button" class="nav-item" data-app="simulator">Simulator</button>
         </nav>
@@ -89,19 +90,70 @@ export function getDashboardHtml(webview: vscode.Webview, extensionUri: vscode.U
     <div id="billingNotice" class="alert info hidden"></div>
     <div id="loading" class="loading hidden">Loading usage…</div>
 
-    <section id="planCycleCard" class="plan-cycle hidden" aria-label="Plan and billing cycle">
-      <div class="plan-cycle-top">
-        <div class="plan-cycle-identity">
-          <span class="plan-cycle-eyebrow">Your plan</span>
-          <h2 id="planCycleName">—</h2>
+    <section id="overviewView">
+      <section id="planCycleCard" class="plan-cycle hidden" aria-label="Plan and billing cycle">
+        <div class="plan-cycle-top">
+          <div class="plan-cycle-identity">
+            <span class="plan-cycle-eyebrow">Your plan</span>
+            <h2 id="planCycleName">—</h2>
+          </div>
+          <div class="plan-cycle-reset" id="planCycleReset"></div>
         </div>
-        <div class="plan-cycle-reset" id="planCycleReset"></div>
+        <div class="plan-cycle-bar-row hidden" id="planCycleBarRow">
+          <div class="plan-cycle-bar-track"><div class="plan-cycle-bar-fill" id="planCycleBarFill"></div></div>
+          <span class="plan-cycle-bar-label" id="planCycleBarLabel"></span>
+        </div>
+        <p class="plan-cycle-note" id="planCycleNote"></p>
+      </section>
+
+      <div class="ov-toolbar">
+        <div class="date-presets" role="group" aria-label="Period">
+          <button type="button" class="preset-btn" data-preset="today">Today</button>
+          <button type="button" class="preset-btn" data-preset="7d">7 days</button>
+          <button type="button" class="preset-btn active" data-preset="30d">30 days</button>
+        </div>
+        <div class="date-presets" role="group" aria-label="Cost mode">
+          <button type="button" class="preset-btn cost-mode-btn active" data-cost-mode="value">What-if</button>
+          <button type="button" class="preset-btn cost-mode-btn" data-cost-mode="billed">Billed</button>
+        </div>
       </div>
-      <div class="plan-cycle-bar-row hidden" id="planCycleBarRow">
-        <div class="plan-cycle-bar-track"><div class="plan-cycle-bar-fill" id="planCycleBarFill"></div></div>
-        <span class="plan-cycle-bar-label" id="planCycleBarLabel"></span>
+
+      <div class="ov-stats">
+        <article class="ov-stat ov-stat-primary">
+          <span class="ov-stat-label" id="ovCostLabel">Token cost</span>
+          <span class="ov-stat-value" id="ovCost">—</span>
+          <span class="ov-stat-sub" id="ovCostSub"></span>
+        </article>
+        <article class="ov-stat">
+          <span class="ov-stat-label">Requests</span>
+          <span class="ov-stat-value" id="ovRequests">—</span>
+          <span class="ov-stat-sub" id="ovRequestsSub"></span>
+        </article>
+        <article class="ov-stat">
+          <span class="ov-stat-label">Cache savings</span>
+          <span class="ov-stat-value ov-stat-green" id="ovSavings">—</span>
+          <span class="ov-stat-sub" id="ovSavingsSub"></span>
+        </article>
       </div>
-      <p class="plan-cycle-note" id="planCycleNote"></p>
+
+      <div class="ov-lower">
+        <article class="panel ov-trend-panel">
+          <div class="ov-trend-head">
+            <h3>Daily spend</h3>
+            <span class="panel-desc" id="ovTrendRange"></span>
+          </div>
+          <div class="chart-box ov-sparkline-box"><canvas id="ovSparkline"></canvas></div>
+          <p class="ov-empty-note hidden" id="ovSparklineEmpty">No requests in this period yet.</p>
+        </article>
+
+        <article class="panel ov-insight-panel hidden" id="ovInsightPanel">
+          <h3>Worth knowing</h3>
+          <div class="finding-card ov-insight-card" id="ovInsightCard"></div>
+          <button type="button" class="btn-link-inline" id="ovSeeAllInsights">See all insights →</button>
+        </article>
+      </div>
+
+      <button type="button" class="btn ov-details-btn" id="ovViewRequests">View full request log &amp; charts →</button>
     </section>
 
     <main id="usageView" class="hidden">

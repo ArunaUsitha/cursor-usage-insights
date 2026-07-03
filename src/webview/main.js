@@ -93,7 +93,7 @@ const state = {
   page: 1,
   pageSize: 25,
   panel: 'requests',
-  appView: 'usage',
+  appView: 'overview',
   simMode: 'request',
   simRequestId: null,
   simCompareSelected: null,
@@ -774,7 +774,9 @@ function renderKpis(summary) {
     : '—';
 
   const billingEl = $('billingNotice');
-  if (billingEl) {
+  if (billingEl && state.appView !== 'usage') {
+    billingEl.classList.add('hidden');
+  } else if (billingEl) {
     const messages = {
       usage: 'Your plan bills a flat <strong>usage fee per request</strong> (often $0.04) separately from <strong>token cost</strong>. Token cost is what drives optimization.',
       token: 'Your plan uses <strong>token-based billing</strong>. The Cost column shows <code>chargedCents</code> from Cursor — the full amount billed per request (model + fees).',
@@ -898,8 +900,12 @@ async function loadTrendComparison() {
     state.trend.previous = null;
   }
 
-  if (state.trend.key === key && state.panel === 'analytics' && state.appView === 'usage') {
+  if (state.trend.key !== key) return;
+  if (state.panel === 'analytics' && state.appView === 'usage') {
     renderAnalyticsStats(state.filtered, summarize(state.filtered), state.trend.previous);
+  }
+  if (state.appView === 'overview') {
+    $('ovCostSub').innerHTML = state.trend.previous ? trendBadge(summarize(state.filtered).totalCost, state.trend.previous.totalCost) : '';
   }
 }
 
@@ -928,6 +934,138 @@ function refresh() {
   if (state.appView === 'analyze') {
     renderAnalyze();
   }
+
+  if (state.appView === 'overview') {
+    renderOverview();
+  }
+}
+
+/** Highest-severity finding worth surfacing on the simple Overview screen. */
+function pickTopFinding(findings) {
+  if (!findings?.length) return null;
+  return findings.find((f) => f.severity === 'high')
+    || findings.find((f) => f.severity === 'medium')
+    || findings[0];
+}
+
+let ovSparklineChart = null;
+
+function destroyOvSparkline() {
+  if (ovSparklineChart) {
+    ovSparklineChart.destroy();
+    ovSparklineChart = null;
+  }
+}
+
+function renderOvSparkline(events) {
+  const box = $('ovSparklineEmpty');
+  const canvas = $('ovSparkline');
+  if (!canvas) return;
+
+  const byDay = groupByDay(events);
+  const days = Object.keys(byDay).sort();
+  destroyOvSparkline();
+
+  if (!days.length) {
+    canvas.classList.add('hidden');
+    box?.classList.remove('hidden');
+    return;
+  }
+  canvas.classList.remove('hidden');
+  box?.classList.add('hidden');
+
+  const labels = days.map((d) => new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+  const values = days.map((d) => byDay[d]);
+  const accent = themeColor('--vscode-textLink-foreground', '#2563eb');
+
+  ovSparklineChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderColor: accent,
+        backgroundColor: `color-mix(in srgb, ${accent} 12%, transparent)`,
+        fill: true,
+        tension: 0.35,
+        borderWidth: 2,
+        pointRadius: (ctx) => (ctx.dataIndex === values.length - 1 ? 4 : 0),
+        pointHoverRadius: 5,
+        pointBackgroundColor: accent,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: chartTooltipBg(),
+          titleColor: chartTooltipFg(),
+          bodyColor: chartTooltipFg(),
+          padding: 8,
+          cornerRadius: 8,
+          callbacks: { label: (ctx) => ` ${formatChartMoney(ctx.parsed.y)}` },
+        },
+      },
+      scales: {
+        x: { display: false },
+        y: { display: false, beginAtZero: true },
+      },
+    },
+  });
+}
+
+/**
+ * Renders the simple Overview screen from data already loaded for the
+ * Requests tab (state.filtered/state.all) — no separate fetch. Handles the
+ * zero-events and not-signed-in cases gracefully rather than assuming data
+ * is present.
+ */
+function renderOverview() {
+  if (!$('overviewView')) return;
+
+  const events = state.filtered;
+  const summary = summarize(events);
+
+  const freePlan = isFreePlan();
+  const showWhatIfPrefix = state.costMode === 'value' && freePlan;
+  $('ovCostLabel').textContent = state.costMode === 'billed' ? 'Billed cost' : 'Token cost';
+  $('ovCost').textContent = `${showWhatIfPrefix ? '~' : ''}${fmt.money(summary.totalCost)}`;
+  $('ovCostSub').innerHTML = state.trend.key === currentTrendKey() && state.trend.previous
+    ? trendBadge(summary.totalCost, state.trend.previous.totalCost)
+    : '';
+
+  $('ovRequests').textContent = fmt.num(summary.count);
+  $('ovRequestsSub').textContent = summary.count ? `${fmt.num(summary.withCost)} with cost data` : 'No requests in this period';
+
+  $('ovSavings').textContent = fmt.money(summary.totalSavings);
+  const savingsPct = summary.noCache > 0 ? (summary.totalSavings / summary.noCache) * 100 : null;
+  $('ovSavingsSub').textContent = savingsPct != null ? `${fmt.pct(savingsPct)} of est. cost without cache` : '';
+
+  const rangeLabel = `${fmt.shortDate($('startDate').value)} – ${fmt.shortDate($('endDate').value)}`;
+  $('ovTrendRange').textContent = rangeLabel;
+  renderOvSparkline(events);
+
+  const insightPanel = $('ovInsightPanel');
+  if (events.length) {
+    const data = computeAnalyzeData(events, summary);
+    const top = pickTopFinding(data.findings);
+    if (top) {
+      insightPanel.classList.remove('hidden');
+      $('ovInsightCard').className = `finding-card ov-insight-card severity-${top.severity}`;
+      $('ovInsightCard').innerHTML = `
+        <h4>${esc(top.title)}</h4>
+        <p>${esc(top.body)}</p>
+        <span class="finding-action">→ ${esc(top.action)}</span>`;
+    } else {
+      insightPanel.classList.add('hidden');
+    }
+  } else {
+    insightPanel.classList.add('hidden');
+  }
+
+  void loadTrendComparison();
 }
 
 // ---------------------------------------------------------------------------
@@ -944,6 +1082,7 @@ async function load() {
 
   $('loading').classList.remove('hidden');
   $('usageView').classList.add('hidden');
+  $('overviewView').classList.add('hidden');
 
   try {
     const [usage, pricingData] = await Promise.all([
@@ -958,14 +1097,17 @@ async function load() {
     state.page = 1;
     destroyCharts();
     renderPlanCycle(usage.quota, usage.hardLimit);
+    if (state.appView === 'overview') $('overviewView').classList.remove('hidden');
 
     if (usage.authMode === 'none') {
       showAlert('warn', 'Not signed in. Open Cursor while logged into your account, or run "Cursor Usage: Set Session Token Manually" from the command palette.');
+      renderOverview();
       return;
     }
 
     if (!state.all.length) {
       showAlert('warn', 'No usage events in this date range.');
+      renderOverview();
       return;
     }
 
@@ -982,6 +1124,7 @@ async function load() {
       : '';
     showAlert('info', `Loaded ${state.all.length} requests${usage.email ? ` for ${usage.email}` : ''}${planLabel() ? ` (${planLabel()})` : ''}.${fallbackNote}`);
     refresh();
+    if (state.appView === 'overview') renderOverview();
     if (state.appView === 'simulator') refreshSimulator();
     if (state.appView === 'analyze') renderAnalyze();
   } catch (err) {
@@ -1928,6 +2071,7 @@ function runSimulator() {
 
 function setAppView(view) {
   state.appView = view;
+  $('overviewView').classList.toggle('hidden', view !== 'overview');
   $('usageView').classList.toggle('hidden', view !== 'usage');
   $('analyzeView').classList.toggle('hidden', view !== 'analyze');
   $('simulatorView').classList.toggle('hidden', view !== 'simulator');
@@ -1940,6 +2084,7 @@ function setAppView(view) {
     if (btn.disabled) return;
     btn.classList.toggle('active', btn.dataset.app === view);
   });
+  if (view === 'overview') renderOverview();
   if (view === 'simulator') refreshSimulator();
   if (view === 'analyze') renderAnalyze();
 }
@@ -2000,6 +2145,8 @@ async function init() {
   });
 
   $('goAnalyzeTab')?.addEventListener('click', () => setAppView('analyze'));
+  $('ovSeeAllInsights')?.addEventListener('click', () => setAppView('analyze'));
+  $('ovViewRequests')?.addEventListener('click', () => setAppView('usage'));
 
   document.querySelectorAll('.nav-item[data-app]').forEach((btn) => {
     if (btn.disabled) return;

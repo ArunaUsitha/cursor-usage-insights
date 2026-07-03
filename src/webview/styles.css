@@ -193,6 +193,77 @@ input:focus, select:focus, textarea:focus {
 
 .loading { color: var(--muted); padding: 24px 0; text-align: center; }
 
+/* ----------------------------------------------------------------- overview */
+
+#overviewView { margin-bottom: 8px; }
+
+.ov-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.ov-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.ov-stat {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ov-stat-primary { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.ov-stat-label {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ov-stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.ov-stat-green.ov-stat-value { color: var(--green-strong); }
+.ov-stat-sub { color: var(--muted); font-size: 12px; min-height: 1.4em; }
+
+.ov-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.ov-trend-panel, .ov-insight-panel { margin: 0; }
+.ov-trend-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ov-trend-head h3 { font-size: 13px; }
+.ov-sparkline-box { position: relative; height: 140px; margin-top: 8px; }
+.ov-empty-note { color: var(--muted); font-size: 12.5px; text-align: center; padding: 40px 0 20px; margin: 0; }
+
+.ov-insight-card { margin-top: 8px; }
+.ov-insight-panel h3 { font-size: 13px; margin-bottom: 0; }
+.ov-insight-panel .btn-link-inline { margin-top: 10px; font-size: 12.5px; }
+
+.ov-details-btn {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  text-align: center;
+}
+
+@media (max-width: 780px) {
+  .ov-lower { grid-template-columns: 1fr; }
+}
+
 /* --------------------------------------------------------------- plan/cycle */
 
 .plan-cycle {

@@ -4,15 +4,21 @@ Analyze how you spend Cursor tokens — costs, cache savings, model breakdowns, 
 
 This is the extension version of the standalone Cursor Usage Dashboard web app. Because it runs inside Cursor, there's no local proxy server and no login step: it reuses the session Cursor itself created when you signed in.
 
+## Structure
+
+The dashboard has four tabs, ordered from simple to detailed:
+
+- **Overview** (default tab) — the simple main screen: your plan and billing-cycle status, three key numbers (cost, requests, cache savings), a small daily-spend sparkline, and the single most important insight, if any. A "What-if / Billed" and period toggle control the whole dashboard from here. One button ("View full request log & charts →") jumps to the details.
+- **Requests** — the detailed view: full filter bar (custom date range, model filter), KPI strip, sortable/paginated request log with per-request cache savings and expensive-request highlighting, and an Analytics sub-tab (daily token cost, cost by model, token volume, with a week-over-week trend badge).
+- **Analyze** — rule-based findings (model concentration, cache health, cold starts, heavy-output requests, spike requests) with **configurable thresholds**, spend-by-model and cache panels, top expensive requests, and an **"Ask Cursor Chat" brief builder**: pick a template + data scopes, copy a compact brief, and paste it into Cursor Chat for AI analysis of your own usage.
+- **Simulator** — replay any real request's token profile against other models' published rates ("what would this request have cost on X?"), or price a custom token profile.
+
 ## Features
 
-- **Usage view** — KPI cards (requests, token cost, cache savings, avg/request), a sortable + paginated request log with per-request cache savings and expensive-request highlighting, and analytics charts (daily token cost, cost by model, token volume) with a **week-over-week trend badge** (▲/▼ vs the prior equal-length period).
-- **Analyze view** — rule-based findings (model concentration, cache health, cold starts, heavy-output requests, spike requests) with **configurable thresholds** (tune what counts as a "cold start" or "dominant model" to your own usage), spend-by-model and cache panels, top-10 expensive requests, and an **"Ask Cursor Chat" brief builder**: pick a template + data scopes, copy a compact brief, and paste it into Cursor Chat for AI analysis of your own usage.
-- **Simulator** — replay any real request's token profile against other models' published rates ("what would this request have cost on X?"), or price a custom token profile.
+- **Plan-aware** — detects your plan (Free/Pro/Business/…) and shows a **What-if / Billed** cost toggle: What-if is the API-equivalent value of your tokens (useful for optimizing even on a plan where nothing is actually charged); Billed is what you were actually charged. A prominent **Plan & cycle** panel on the Overview tab shows a progress bar (used/limit + reset date + burn-rate projection) when Cursor reports a fixed request quota for your plan — and says so plainly when it doesn't (most Auto/token-metered usage isn't tracked by that legacy quota system, which is expected, not a bug).
 - **Status bar** — live token cost for the last 30 days (configurable), color-coded (warning/error background) as you approach your plan's included-request limit, with a burn-rate projection ("~12 days until included requests run out") in the tooltip. Click to open the dashboard. Auto-refreshes, and also syncs immediately whenever you open/refresh the dashboard.
-- **Plan-aware** — detects your plan (Free/Pro/Business/…) and shows a **What-if / Billed** cost toggle: What-if is the API-equivalent value of your tokens (useful for optimizing even on a plan where nothing is actually charged); Billed is what you were actually charged. A prominent **Plan & cycle** panel at the top of the Usage view shows a progress bar (used/limit + reset date + burn-rate projection) when Cursor reports a fixed request quota for your plan — and says so plainly when it doesn't (most Auto/token-metered usage isn't tracked by that legacy quota system, which is expected, not a bug).
 - Billing-mode aware: handles token-based plans, usage-based plans ($0.04/request-style flat fees shown separately from token cost), and mixed ranges after a plan change.
-- Date presets (today / 7d / 30d / custom), model filter, CSV export.
+- CSV export, model filter, custom date ranges (Requests tab).
 - Resilient pricing: if cursor.com's pricing page can't be reached or its layout changes, the dashboard falls back to a small bundled rate table (clearly flagged) instead of breaking cost estimates.
 
 ## How authentication works
