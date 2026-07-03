@@ -161,6 +161,25 @@ function planLabel() {
   return labels[t] || `${t} plan`;
 }
 
+/** Renders the plan-usage KPI card, or hides it if no quota data was returned. */
+function renderQuota(quota) {
+  const card = $('kpiQuotaCard');
+  if (!card) return;
+  if (!quota || quota.used == null) {
+    card.classList.add('hidden');
+    return;
+  }
+  card.classList.remove('hidden');
+  const unlimited = quota.limit == null || quota.limit <= 0;
+  $('kpiQuota').textContent = unlimited ? fmt.num(quota.used) : `${fmt.num(quota.used)} / ${fmt.num(quota.limit)}`;
+  if (unlimited) {
+    $('kpiQuotaSub').textContent = 'Included requests this cycle · no fixed limit found';
+  } else {
+    const pct = (quota.used / quota.limit) * 100;
+    $('kpiQuotaSub').textContent = `${fmt.pct(pct)} of this cycle's included requests`;
+  }
+}
+
 /** Events re-mapped so `cost` reflects the active cost mode. */
 function applyCostMode(events) {
   if (state.costMode !== 'billed') return events;
@@ -812,6 +831,7 @@ async function load() {
     state.all = (usage.events || []).map((raw) => normalize(raw, state.pricing, normOpts));
     state.page = 1;
     destroyCharts();
+    renderQuota(usage.quota);
 
     if (usage.authMode === 'none') {
       showAlert('warn', 'Not signed in. Open Cursor while logged into your account, or run "Cursor Usage: Set Session Token Manually" from the command palette.');

@@ -233,5 +233,24 @@ test('free plan forces 0 regardless of chargedCents', () => {
   assert.equal(service.sumBilledCostDollars(events, { membershipType: 'pro' }), 5.0);
 });
 
+console.log('api.parseQuotaResponse');
+test('prefers the gpt-4 bucket and passes through startOfMonth', () => {
+  const quota = api.parseQuotaResponse({
+    'gpt-4': { numRequests: 342, maxRequestUsage: 500 },
+    'gpt-3.5-turbo': { numRequests: 10, maxRequestUsage: 1000 },
+    startOfMonth: '2026-07-01T00:00:00.000Z',
+  });
+  assert.deepEqual(quota, { used: 342, limit: 500, startOfCycleIso: '2026-07-01T00:00:00.000Z' });
+});
+test('falls back to any bucket with a limit when gpt-4 is absent', () => {
+  const quota = api.parseQuotaResponse({ 'claude-3.5-sonnet': { numRequests: 5, maxRequestUsage: 50 } });
+  assert.deepEqual(quota, { used: 5, limit: 50 });
+});
+test('returns null for shapes with no request-quota buckets', () => {
+  assert.equal(api.parseQuotaResponse({ someOtherField: 1 }), null);
+  assert.equal(api.parseQuotaResponse(null), null);
+  assert.equal(api.parseQuotaResponse('not an object'), null);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

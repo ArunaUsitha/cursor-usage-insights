@@ -112,6 +112,11 @@ export function getDashboardHtml(webview: vscode.Webview, extensionUri: vscode.U
           <span class="kpi-value" id="kpiAvg">—</span>
           <span class="kpi-sub" id="kpiAvgSub"></span>
         </article>
+        <article class="kpi hidden" id="kpiQuotaCard">
+          <span class="kpi-label">Plan usage <span class="tip" tabindex="0" data-tip="Included/premium requests used this billing cycle, from Cursor's account usage. Best-effort — hidden if this data isn't available for your plan.">ⓘ</span></span>
+          <span class="kpi-value" id="kpiQuota">—</span>
+          <span class="kpi-sub" id="kpiQuotaSub"></span>
+        </article>
       </section>
 
       <div class="view-toggle" role="tablist" aria-label="Usage views">

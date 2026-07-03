@@ -214,6 +214,55 @@ export async function fetchStripeProfile(session: CursorSession): Promise<PlanIn
   };
 }
 
+export interface PlanQuota {
+  used: number;
+  limit: number | null;
+  startOfCycleIso?: string;
+}
+
+/**
+ * Parse cursor.com's legacy usage-quota shape: buckets keyed by model family
+ * with numRequests/maxRequestUsage (e.g. { "gpt-4": { numRequests, maxRequestUsage } }).
+ * Defensive by design — this endpoint's shape isn't documented, so any
+ * mismatch just yields null and the quota card is hidden rather than showing
+ * a wrong number.
+ */
+export function parseQuotaResponse(data: any): PlanQuota | null {
+  if (!data || typeof data !== 'object') return null;
+  let best: PlanQuota | null = null;
+  for (const [key, v] of Object.entries<any>(data)) {
+    if (!v || typeof v !== 'object') continue;
+    if (!('numRequests' in v) && !('maxRequestUsage' in v)) continue;
+    const quota: PlanQuota = {
+      used: num(v.numRequests) ?? num(v.numRequestsTotal) ?? 0,
+      limit: num(v.maxRequestUsage),
+    };
+    if (key === 'gpt-4') {
+      best = quota;
+      break;
+    }
+    if (!best || (best.limit == null && quota.limit != null)) best = quota;
+  }
+  if (!best) return null;
+  if (typeof data.startOfMonth === 'string') best.startOfCycleIso = data.startOfMonth;
+  return best;
+}
+
+/** Included/premium request quota for the current billing cycle (undocumented endpoint — best-effort). */
+export async function fetchPlanQuota(session: CursorSession): Promise<PlanQuota | null> {
+  const data = await fetchJson(
+    `https://cursor.com/api/usage?user=${encodeURIComponent(session.userId)}`,
+    {
+      method: 'GET',
+      headers: {
+        ...BROWSER_HEADERS,
+        Cookie: `WorkosCursorSessionToken=${session.cookieValue}`,
+      },
+    },
+  );
+  return parseQuotaResponse(data);
+}
+
 /** Validates the session and returns account info. */
 export async function fetchMe(session: CursorSession): Promise<{ email?: string; name?: string }> {
   const data = await fetchJson('https://cursor.com/api/auth/me', {
