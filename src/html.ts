@@ -94,8 +94,14 @@ export function getDashboardHtml(webview: vscode.Webview, extensionUri: vscode.U
       <section id="planCycleCard" class="plan-cycle hidden" aria-label="Plan and billing cycle">
         <div class="plan-cycle-top">
           <div class="plan-cycle-identity">
-            <span class="plan-cycle-eyebrow">Your plan</span>
-            <h2 id="planCycleName">—</h2>
+            <svg class="plan-cycle-ring hidden" id="planCycleRing" viewBox="0 0 36 36" width="36" height="36" aria-hidden="true">
+              <circle class="ring-track" cx="18" cy="18" r="15.5" />
+              <circle class="ring-fill" id="planCycleRingFill" cx="18" cy="18" r="15.5" />
+            </svg>
+            <div>
+              <span class="plan-cycle-eyebrow">Your plan</span>
+              <h2 id="planCycleName">—</h2>
+            </div>
           </div>
           <div class="plan-cycle-reset" id="planCycleReset"></div>
         </div>

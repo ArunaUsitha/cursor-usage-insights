@@ -293,6 +293,9 @@ test('missing/negative limit is also unlimited', () => {
 test('normal limit computes a percentage', () => {
   assert.equal(service.quotaPercentUsed({ used: 250, limit: 500 }), 50);
 });
+test('usage over the limit is not clamped to 100 — callers need the true % to show "limit reached"', () => {
+  assert.equal(service.quotaPercentUsed({ used: 512, limit: 500 }), 102.4);
+});
 
 console.log('projectExhaustionDate (service.ts and logic.js copies agree)');
 const DAY = 24 * 60 * 60 * 1000;

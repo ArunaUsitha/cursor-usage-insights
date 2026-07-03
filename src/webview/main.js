@@ -30,10 +30,23 @@ const vscode = acquireVsCodeApi();
 const rpcPending = new Map();
 let rpcSeq = 0;
 
-function rpc(method, params) {
+/**
+ * Bridges a call to the extension host. Always settles: if the host never
+ * posts back an rpc-result (a bug on that side, or a message that got lost),
+ * this rejects after `timeoutMs` instead of leaving callers (and the loading
+ * spinner) hanging forever with no explanation.
+ */
+function rpc(method, params, timeoutMs = 25000) {
   return new Promise((resolve, reject) => {
     const id = ++rpcSeq;
-    rpcPending.set(id, { resolve, reject });
+    const timer = setTimeout(() => {
+      rpcPending.delete(id);
+      reject(new Error(`"${method}" timed out waiting for a response from the extension. Run "Cursor Usage: Show Logs" to see what happened.`));
+    }, timeoutMs);
+    rpcPending.set(id, {
+      resolve: (result) => { clearTimeout(timer); resolve(result); },
+      reject: (err) => { clearTimeout(timer); reject(err); },
+    });
     vscode.postMessage({ type: 'rpc', id, method, params });
   });
 }
@@ -178,15 +191,20 @@ function planLabel() {
 const PLAN_CYCLE_WARN_PCT = 80;
 const PLAN_CYCLE_CRITICAL_PCT = 95;
 
+const RING_CIRCUMFERENCE = 97.39; // 2 * PI * r, r = 15.5 (must match the SVG circle radius)
+
 /**
  * Renders the prominent Plan & cycle panel at the top of the dashboard, or
  * hides it entirely if Cursor returned nothing usable for this account.
  *
  * Three honest states, not one generic "quota" number:
- *  - a real fixed request limit was found -> progress bar + %.
- *  - a plan is known but no fixed limit was found -> explain why (most
- *    Auto/token-metered usage isn't tracked by this legacy endpoint) instead
- *    of showing a bare "0" that reads as broken.
+ *  - a real fixed request limit was found -> fill ring + bar with exact
+ *    numbers, including when usage has gone over the limit.
+ *  - no fixed limit, but Cursor reports a real (nonzero) usage count for
+ *    this cycle -> show that count plainly, no bar (nothing to divide by).
+ *  - no fixed limit AND nothing meaningful to show (e.g. a stuck 0 while
+ *    the loaded period clearly has real requests) -> explain why instead of
+ *    displaying a number that would just be wrong.
  *  - nothing at all -> hide the panel; the rest of the dashboard still works.
  */
 function renderPlanCycle(quota, hardLimit) {
@@ -213,19 +231,34 @@ function renderPlanCycle(quota, hardLimit) {
   }
 
   const barRow = $('planCycleBarRow');
+  const ring = $('planCycleRing');
   const noteEl = $('planCycleNote');
   const hasLimit = quota && quota.limit != null && quota.limit > 0 && quota.used != null;
+  // A count with no fixed limit is only worth showing if it looks real — a
+  // stuck 0 next to a period with actual loaded requests is more likely an
+  // untracked bucket than genuinely zero usage.
+  const hasMeaningfulCountOnly = quota && !hasLimit && quota.used > 0;
 
   if (hasLimit) {
-    const pct = Math.min(100, (quota.used / quota.limit) * 100);
+    const pctExact = (quota.used / quota.limit) * 100; // uncapped — used for numbers and severity
+    const pctVisual = Math.min(100, pctExact); // capped — used for the bar/ring fill
+    const overLimit = quota.used > quota.limit;
+
     barRow.classList.remove('hidden');
-    $('planCycleBarFill').style.width = `${pct}%`;
-    $('planCycleBarLabel').textContent = `${fmt.num(quota.used)} / ${fmt.num(quota.limit)} (${fmt.pct(pct)})`;
-    if (pct >= PLAN_CYCLE_CRITICAL_PCT) card.classList.add('plan-cycle-critical');
-    else if (pct >= PLAN_CYCLE_WARN_PCT) card.classList.add('plan-cycle-warning');
+    ring.classList.remove('hidden');
+    $('planCycleBarFill').style.width = `${pctVisual}%`;
+    $('planCycleRingFill').style.strokeDashoffset = `${RING_CIRCUMFERENCE * (1 - pctVisual / 100)}`;
+    $('planCycleBarLabel').textContent = overLimit
+      ? `${fmt.num(quota.used)} / ${fmt.num(quota.limit)} · limit reached (${fmt.pct(pctExact)})`
+      : `${fmt.num(quota.used)} / ${fmt.num(quota.limit)} (${fmt.pct(pctExact)})`;
+
+    if (overLimit || pctExact >= PLAN_CYCLE_CRITICAL_PCT) card.classList.add('plan-cycle-critical');
+    else if (pctExact >= PLAN_CYCLE_WARN_PCT) card.classList.add('plan-cycle-warning');
 
     const notes = [];
-    if (quota.startOfCycleIso) {
+    if (overLimit) {
+      notes.push(`You've used ${fmt.num(quota.used - quota.limit)} more request${quota.used - quota.limit === 1 ? '' : 's'} than this cycle's included amount.`);
+    } else if (quota.startOfCycleIso) {
       const sinceMs = new Date(quota.startOfCycleIso).getTime();
       if (!Number.isNaN(sinceMs)) {
         const exhaustion = projectExhaustionDate(quota.used, quota.limit, sinceMs);
@@ -239,8 +272,15 @@ function renderPlanCycle(quota, hardLimit) {
     }
     if (hardLimit) notes.push(`Usage-based spend cap: $${hardLimit.toFixed(2)}/mo.`);
     noteEl.textContent = notes.join(' ');
+  } else if (hasMeaningfulCountOnly) {
+    barRow.classList.add('hidden');
+    ring.classList.add('hidden');
+    const notes = [`${fmt.num(quota.used)} requests this cycle · no fixed limit found for this plan.`];
+    if (hardLimit) notes.push(`Usage-based spend cap: $${hardLimit.toFixed(2)}/mo.`);
+    noteEl.textContent = notes.join(' ');
   } else {
     barRow.classList.add('hidden');
+    ring.classList.add('hidden');
     const notes = [];
     if (quota) {
       notes.push(

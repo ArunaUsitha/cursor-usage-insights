@@ -284,6 +284,11 @@ input:focus, select:focus, textarea:focus {
   gap: 12px;
   flex-wrap: wrap;
 }
+.plan-cycle-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .plan-cycle-eyebrow {
   display: block;
   color: var(--muted);
@@ -297,6 +302,24 @@ input:focus, select:focus, textarea:focus {
   font-weight: 700;
   letter-spacing: -0.01em;
 }
+
+.plan-cycle-ring { flex-shrink: 0; transform: rotate(-90deg); }
+.plan-cycle-ring .ring-track {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 3;
+}
+.plan-cycle-ring .ring-fill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 97.39;
+  stroke-dashoffset: 97.39;
+  transition: stroke-dashoffset 0.4s ease, stroke 0.3s ease;
+}
+.plan-cycle.plan-cycle-warning .plan-cycle-ring .ring-fill { stroke: var(--amber); }
+.plan-cycle.plan-cycle-critical .plan-cycle-ring .ring-fill { stroke: var(--red); }
 .plan-cycle-reset {
   color: var(--muted);
   font-size: 12px;

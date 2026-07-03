@@ -107,8 +107,11 @@ export class UsageStatusBar {
       tooltip.appendMarkdown(`- Requests: **${result.events.length.toLocaleString('en-US')}**\n`);
       if (result.plan?.membershipType) tooltip.appendMarkdown(`- Plan: ${result.plan.membershipType}\n`);
       if (quota && hasQuotaLimit) {
+        const overLimit = quota.used > quota.limit!;
         tooltip.appendMarkdown(
-          `- Plan usage: **${quota.used.toLocaleString('en-US')} / ${quota.limit!.toLocaleString('en-US')}** (${quotaPct!.toFixed(0)}%)\n`,
+          overLimit
+            ? `- Plan usage: **${quota.used.toLocaleString('en-US')} / ${quota.limit!.toLocaleString('en-US')} · limit reached** (${quotaPct!.toFixed(0)}%)\n`
+            : `- Plan usage: **${quota.used.toLocaleString('en-US')} / ${quota.limit!.toLocaleString('en-US')}** (${quotaPct!.toFixed(0)}%)\n`,
         );
         if (quota.resetIso) {
           const resetDate = new Date(quota.resetIso);
@@ -130,6 +133,8 @@ export class UsageStatusBar {
             }
           }
         }
+      } else if (quota && quota.used > 0) {
+        tooltip.appendMarkdown(`- Plan usage: **${quota.used.toLocaleString('en-US')}** requests this cycle (no fixed limit found)\n`);
       } else if (quota) {
         tooltip.appendMarkdown(
           `- No fixed request quota found for this plan — usage like Auto is metered by token cost above, not a request count\n`,
