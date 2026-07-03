@@ -75,6 +75,15 @@ const storage = {
 // State
 // ---------------------------------------------------------------------------
 
+const ANALYZE_THRESHOLD_DEFAULTS = {
+  modelDominancePct: 40,
+  cacheHitWarnPct: 30,
+  coldStartInputTokens: 3000,
+  coldStartCount: 5,
+  heavyOutputTokens: 2000,
+  heavyOutputCount: 3,
+};
+
 const state = {
   all: [],
   filtered: [],
@@ -98,6 +107,8 @@ const state = {
   datePreset: '30d',
   costMode: 'value', // 'value' (what-if API-equivalent) | 'billed' (actual charges)
   plan: null,
+  trend: { key: null, previous: null },
+  analyzeThresholds: { ...ANALYZE_THRESHOLD_DEFAULTS },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -428,7 +439,16 @@ function formatChartTokens(v) {
   return String(Math.round(v));
 }
 
-function renderAnalyticsStats(events, summary) {
+/** ▲/▼ delta badge vs the previous equal-length period; null when there's nothing to compare or the baseline is 0. */
+function trendBadge(current, previous) {
+  if (previous == null || !(previous > 0)) return '';
+  const pct = ((current - previous) / previous) * 100;
+  if (Math.abs(pct) < 1) return '<span class="trend-badge trend-flat">flat vs prior period</span>';
+  const up = pct > 0;
+  return `<span class="trend-badge ${up ? 'trend-up' : 'trend-down'}">${up ? '▲' : '▼'} ${Math.abs(pct).toFixed(0)}% vs prior period</span>`;
+}
+
+function renderAnalyticsStats(events, summary, previousSummary) {
   const el = $('analyticsStats');
   if (!el) return;
   const byDay = groupByDay(events);
@@ -440,7 +460,7 @@ function renderAnalyticsStats(events, summary) {
   const cachePct = totalTok > 0 ? (tokens.cacheRead / totalTok) * 100 : 0;
 
   el.innerHTML = `
-    <div class="analytics-stat"><span>Total token cost</span><strong>${fmt.money(summary.totalCost)}</strong><small>${fmt.num(summary.count)} requests</small></div>
+    <div class="analytics-stat"><span>Total token cost</span><strong>${fmt.money(summary.totalCost)}</strong><small>${fmt.num(summary.count)} requests</small>${trendBadge(summary.totalCost, previousSummary?.totalCost)}</div>
     <div class="analytics-stat"><span>Avg / day</span><strong>${fmt.money(avgDaily)}</strong><small>${fmt.num(dayCount)} days</small></div>
     <div class="analytics-stat"><span>Top model</span><strong>${esc(topModel ? topModel[0] : '—')}</strong><small>${topModel ? fmt.money(topModel[1]) : '—'}</small></div>
     <div class="analytics-stat"><span>Cache read share</span><strong>${fmt.pct(cachePct)}</strong><small>${fmt.money(summary.totalSavings)} saved</small></div>`;
@@ -471,10 +491,15 @@ function destroyCharts() {
   state.chartsReady = false;
 }
 
+function currentTrendKey() {
+  return `${$('startDate').value}|${$('endDate').value}|${$('modelFilter').value}|${state.costMode}`;
+}
+
 function renderCharts(events) {
   destroyCharts();
   const summary = summarize(events);
-  renderAnalyticsStats(events, summary);
+  const previousForThisView = state.trend.key === currentTrendKey() ? state.trend.previous : null;
+  renderAnalyticsStats(events, summary, previousForThisView);
 
   const defaults = chartDefaults();
   const muted = chartMuted();
@@ -797,6 +822,45 @@ function setPanel(panel) {
 
   if (panel === 'analytics' && state.filtered.length) {
     renderCharts(state.filtered);
+    void loadTrendComparison();
+  }
+}
+
+/**
+ * Fetches the previous equal-length period (same model filter + cost mode)
+ * so Analytics can show "▲12% vs prior period" badges. Cached per date
+ * range/filter/cost-mode combo; re-renders just the stats row when it lands
+ * (charts aren't touched, so this never causes a flicker/reflow of them).
+ */
+async function loadTrendComparison() {
+  const startStr = $('startDate').value;
+  const endStr = $('endDate').value;
+  if (!startStr || !endStr || !state.pricing) return;
+
+  const modelVal = $('modelFilter').value;
+  const key = currentTrendKey();
+  if (state.trend.key === key) return;
+  state.trend.key = key;
+
+  const startMs = toMs(startStr);
+  const endMs = toMs(endStr, true);
+  const prevEndMs = startMs - 1;
+  const prevStartMs = prevEndMs - (endMs - startMs);
+
+  try {
+    const usage = await rpc('usage', { startDate: prevStartMs, endDate: prevEndMs });
+    if (state.trend.key !== key) return; // superseded by a newer request
+    const normOpts = { freePlan: isFreePlan() };
+    let events = (usage.events || []).map((raw) => normalize(raw, state.pricing, normOpts));
+    if (modelVal) events = events.filter((e) => e.modelRaw === modelVal);
+    events = applyCostMode(events);
+    state.trend.previous = summarize(events);
+  } catch {
+    state.trend.previous = null;
+  }
+
+  if (state.trend.key === key && state.panel === 'analytics' && state.appView === 'usage') {
+    renderAnalyticsStats(state.filtered, summarize(state.filtered), state.trend.previous);
   }
 }
 
@@ -915,6 +979,15 @@ function exportCsv() {
 // Analyze — insights + Cursor Chat brief
 // ---------------------------------------------------------------------------
 
+const ANALYZE_THRESHOLD_FIELDS = [
+  { key: 'modelDominancePct', label: 'Model dominates spend at', suffix: '% of cost', min: 1, max: 100 },
+  { key: 'cacheHitWarnPct', label: 'Warn on cache hit rate below', suffix: '%', min: 0, max: 100 },
+  { key: 'coldStartInputTokens', label: 'Cold start: input tokens above', suffix: 'tokens', min: 0, max: 1000000 },
+  { key: 'coldStartCount', label: 'Cold start: flag when more than', suffix: 'requests', min: 0, max: 10000 },
+  { key: 'heavyOutputTokens', label: 'Heavy output: output tokens above', suffix: 'tokens', min: 0, max: 1000000 },
+  { key: 'heavyOutputCount', label: 'Heavy output: flag when more than', suffix: 'requests', min: 0, max: 10000 },
+];
+
 const ANALYZE_SCOPES = [
   { id: 'summary', label: 'Period summary', hint: 'KPIs, billing mode, date range' },
   { id: 'modelBreakdown', label: 'Spend by model', hint: 'Cost, request count, avg per model' },
@@ -977,6 +1050,7 @@ function saveAnalyzePrefs() {
     storage.setItem(ANALYZE_PREFS_KEY, JSON.stringify({
       templateId: state.analyzeTemplateId,
       scopes: getSelectedAnalyzeScopes(),
+      thresholds: state.analyzeThresholds,
     }));
   } catch {
     // ignore
@@ -995,7 +1069,7 @@ function applyTemplateScopes(templateId) {
   });
 }
 
-function computeAnalyzeData(events, summary) {
+function computeAnalyzeData(events, summary, thresholds = state.analyzeThresholds) {
   const byModel = {};
   const byModelCount = {};
   for (const e of events) {
@@ -1015,8 +1089,8 @@ function computeAnalyzeData(events, summary) {
   const tokens = tokenTotals(events);
   const totalTok = tokens.input + tokens.output + tokens.cacheRead + tokens.cacheWrite;
   const withCache = events.filter((e) => e.cacheReadTokens > 0);
-  const coldStarts = events.filter((e) => e.cacheReadTokens === 0 && e.inputTokens > 3000);
-  const highOutput = events.filter((e) => e.outputTokens > 2000);
+  const coldStarts = events.filter((e) => e.cacheReadTokens === 0 && e.inputTokens > thresholds.coldStartInputTokens);
+  const highOutput = events.filter((e) => e.outputTokens > thresholds.heavyOutputTokens);
   const expensive = [...events].filter((e) => e.cost != null).sort((a, b) => b.cost - a.cost).slice(0, 10);
   const costs = events.map((e) => e.cost).filter((c) => c != null);
   const p75 = percentile(costs, 0.75) ?? 0;
@@ -1031,7 +1105,7 @@ function computeAnalyzeData(events, summary) {
 
   const findings = buildAnalyzeFindings(events, summary, {
     modelRows, tokens, totalTok, withCache, coldStarts, highOutput, expensive, autoPct, cacheHitRate, p75,
-  });
+  }, thresholds);
 
   return {
     summary,
@@ -1046,11 +1120,11 @@ function computeAnalyzeData(events, summary) {
   };
 }
 
-function buildAnalyzeFindings(events, summary, ctx) {
+function buildAnalyzeFindings(events, summary, ctx, thresholds = state.analyzeThresholds) {
   const findings = [];
   const top = ctx.modelRows[0];
 
-  if (top && summary.totalCost > 0 && top.pct >= 40) {
+  if (top && summary.totalCost > 0 && top.pct >= thresholds.modelDominancePct) {
     findings.push({
       severity: 'high',
       title: `${top.model} dominates spend`,
@@ -1069,7 +1143,7 @@ function buildAnalyzeFindings(events, summary, ctx) {
       body: `Estimated ${fmt.money(summary.totalSavings)} saved (${fmt.pct(pct)} of no-cache cost).`,
       action: 'Keep long agent threads open — restarting chats loses cached context.',
     });
-  } else if (ctx.cacheHitRate < 30 && events.length > 10) {
+  } else if (ctx.cacheHitRate < thresholds.cacheHitWarnPct && events.length > 10) {
     findings.push({
       severity: 'medium',
       title: 'Low cache hit rate',
@@ -1078,7 +1152,7 @@ function buildAnalyzeFindings(events, summary, ctx) {
     });
   }
 
-  if (ctx.coldStarts.length > 5) {
+  if (ctx.coldStarts.length > thresholds.coldStartCount) {
     findings.push({
       severity: 'medium',
       title: `${ctx.coldStarts.length} cold starts`,
@@ -1087,7 +1161,7 @@ function buildAnalyzeFindings(events, summary, ctx) {
     });
   }
 
-  if (ctx.highOutput.length > 3) {
+  if (ctx.highOutput.length > thresholds.heavyOutputCount) {
     findings.push({
       severity: 'medium',
       title: 'Heavy output requests',
@@ -1187,7 +1261,7 @@ function renderAnalyzeCachePanel(data) {
     <p class="panel-desc">How context reuse affects cost</p>
     <div class="cache-stat-grid">
       <div class="cache-stat"><span>Requests with cache reads</span><strong>${fmt.num(cache.withCache)} (${fmt.pct(cache.cacheHitRate)})</strong></div>
-      <div class="cache-stat"><span>Cold starts (&gt;3k input, no cache)</span><strong>${fmt.num(cache.coldStarts)}</strong></div>
+      <div class="cache-stat"><span>Cold starts (&gt;${fmt.num(state.analyzeThresholds.coldStartInputTokens)} input, no cache)</span><strong>${fmt.num(cache.coldStarts)}</strong></div>
       <div class="cache-stat"><span>Est. cache savings</span><strong>${fmt.money(cache.totalSavings)}</strong></div>
       <div class="cache-stat"><span>Avg cache read / request</span><strong>${fmt.num(Math.round(cache.avgCacheRead))}</strong></div>
       <div class="cache-stat"><span>Cache read tokens</span><strong>${fmt.num(tokens.cacheRead)} (${pct(tokens.cacheRead)})</strong></div>
@@ -1215,11 +1289,27 @@ function renderAnalyzeExpensivePanel(expensive) {
     </table>`;
 }
 
+function renderThresholdInputs() {
+  const el = $('analyzeThresholds');
+  if (!el) return;
+  el.innerHTML = ANALYZE_THRESHOLD_FIELDS.map((f) => `
+    <label class="threshold-field">
+      ${esc(f.label)}
+      <span class="threshold-field-row">
+        <input type="number" data-threshold="${esc(f.key)}" min="${f.min}" max="${f.max}" value="${state.analyzeThresholds[f.key]}">
+        <span>${esc(f.suffix)}</span>
+      </span>
+    </label>`).join('');
+}
+
 function initAnalyzeSidebar() {
   if ($('analyzeTemplates')?.children.length) return;
 
   const prefs = loadAnalyzePrefs();
   if (prefs?.templateId) state.analyzeTemplateId = prefs.templateId;
+  if (prefs?.thresholds) {
+    state.analyzeThresholds = { ...ANALYZE_THRESHOLD_DEFAULTS, ...prefs.thresholds };
+  }
 
   $('analyzeTemplates').innerHTML = ANALYZE_TEMPLATES.map((t) => `
     <button type="button" class="template-card${t.id === state.analyzeTemplateId ? ' active' : ''}" data-template="${esc(t.id)}" role="option">
@@ -1232,6 +1322,8 @@ function initAnalyzeSidebar() {
       <input type="checkbox" value="${esc(s.id)}">
       <span>${esc(s.label)}<small>${esc(s.hint)}</small></span>
     </label>`).join('');
+
+  renderThresholdInputs();
 
   const tpl = ANALYZE_TEMPLATES.find((t) => t.id === state.analyzeTemplateId) || ANALYZE_TEMPLATES[0];
   const savedScopes = prefs?.scopes;
@@ -1961,6 +2053,25 @@ async function init() {
   $('analyzeScopes')?.addEventListener('change', () => {
     updateBriefPreview();
     saveAnalyzePrefs();
+  });
+
+  $('analyzeThresholds')?.addEventListener('change', (ev) => {
+    const input = ev.target.closest('input[data-threshold]');
+    if (!input) return;
+    const field = ANALYZE_THRESHOLD_FIELDS.find((f) => f.key === input.dataset.threshold);
+    if (!field) return;
+    const clamped = Math.min(field.max, Math.max(field.min, num(input.value)));
+    input.value = clamped;
+    state.analyzeThresholds[field.key] = clamped;
+    saveAnalyzePrefs();
+    renderAnalyze();
+  });
+
+  $('analyzeThresholdsReset')?.addEventListener('click', () => {
+    state.analyzeThresholds = { ...ANALYZE_THRESHOLD_DEFAULTS };
+    renderThresholdInputs();
+    saveAnalyzePrefs();
+    renderAnalyze();
   });
 
   $('analyzeCustomQ')?.addEventListener('input', updateBriefPreview);

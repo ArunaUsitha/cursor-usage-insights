@@ -200,6 +200,11 @@ export function getDashboardHtml(webview: vscode.Webview, extensionUri: vscode.U
       <div id="analyzeContent" class="analyze-layout hidden">
         <div class="analyze-main">
           <header class="analyze-hero panel" id="analyzeHero"></header>
+          <details class="panel analyze-thresholds">
+            <summary>Finding thresholds <span class="tip" tabindex="0" data-tip="Tune when findings below trigger — e.g. raise 'cold start' if you regularly send large one-off prompts on purpose.">ⓘ</span></summary>
+            <div class="threshold-grid" id="analyzeThresholds"></div>
+            <button type="button" class="btn-text" id="analyzeThresholdsReset">Reset to defaults</button>
+          </details>
           <div class="analyze-cards" id="analyzeFindings"></div>
           <div class="analyze-panels">
             <article class="panel" id="analyzeModelPanel"></article>

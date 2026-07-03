@@ -341,6 +341,11 @@ tfoot td {
 .analytics-stat strong { font-size: 16px; }
 .analytics-stat small { color: var(--muted); font-size: 11px; }
 
+.trend-badge { display: block; font-size: 11px; font-weight: 600; margin-top: 2px; }
+.trend-badge.trend-up { color: var(--amber); }
+.trend-badge.trend-down { color: var(--green-strong); }
+.trend-badge.trend-flat { color: var(--muted); font-weight: 400; }
+
 .analytics-chart-main { margin-bottom: 10px; }
 .analytics-chart-row {
   display: grid;
@@ -381,6 +386,19 @@ tfoot td {
 }
 .analyze-hero-stat span { color: var(--muted); font-size: 11px; }
 .analyze-hero-stat strong { font-size: 15px; }
+
+.analyze-thresholds summary { cursor: pointer; font-size: 12px; font-weight: 600; }
+.analyze-thresholds summary .tip { font-weight: 400; }
+.threshold-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.threshold-field { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted); }
+.threshold-field-row { display: flex; align-items: center; gap: 6px; }
+.threshold-field input { width: 90px; }
+.analyze-thresholds .btn-text { margin-top: 8px; }
 
 .analyze-cards {
   display: grid;
