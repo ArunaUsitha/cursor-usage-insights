@@ -218,6 +218,18 @@ export interface PlanQuota {
   used: number;
   limit: number | null;
   startOfCycleIso?: string;
+  /** startOfCycleIso + 1 month, when known — the quota's next reset. */
+  resetIso?: string;
+}
+
+/** startOfCycleIso -> resetIso (one calendar month later), tolerant of malformed dates. */
+function computeResetIso(startOfCycleIso: string | undefined): string | undefined {
+  if (!startOfCycleIso) return undefined;
+  const start = new Date(startOfCycleIso);
+  if (Number.isNaN(start.getTime())) return undefined;
+  const reset = new Date(start);
+  reset.setMonth(reset.getMonth() + 1);
+  return reset.toISOString();
 }
 
 /**
@@ -244,7 +256,10 @@ export function parseQuotaResponse(data: any): PlanQuota | null {
     if (!best || (best.limit == null && quota.limit != null)) best = quota;
   }
   if (!best) return null;
-  if (typeof data.startOfMonth === 'string') best.startOfCycleIso = data.startOfMonth;
+  if (typeof data.startOfMonth === 'string') {
+    best.startOfCycleIso = data.startOfMonth;
+    best.resetIso = computeResetIso(data.startOfMonth);
+  }
   return best;
 }
 
@@ -261,6 +276,21 @@ export async function fetchPlanQuota(session: CursorSession): Promise<PlanQuota 
     },
   );
   return parseQuotaResponse(data);
+}
+
+/** Usage-based spending hard limit in dollars (0/null when unset — undocumented endpoint, best-effort). */
+export async function fetchHardLimit(session: CursorSession): Promise<number | null> {
+  const data = await fetchJson('https://cursor.com/api/dashboard/get-hard-limit', {
+    method: 'POST',
+    headers: {
+      ...BROWSER_HEADERS,
+      'Content-Type': 'application/json',
+      Cookie: `WorkosCursorSessionToken=${session.cookieValue}`,
+    },
+    body: '{}',
+  });
+  const limit = num(data?.hardLimit);
+  return limit != null && limit > 0 ? limit : null;
 }
 
 /** Validates the session and returns account info. */

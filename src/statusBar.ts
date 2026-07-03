@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { UsageService, sumBilledCostDollars, sumTokenCostDollars } from './service';
+import { UsageService, projectExhaustionDate, sumBilledCostDollars, sumTokenCostDollars } from './service';
 
 type CostMode = 'value' | 'billed';
 
@@ -40,6 +40,8 @@ export class UsageStatusBar {
       intervalMinutes: Math.max(5, cfg.get<number>('refreshIntervalMinutes', 15)),
       periodDays: Math.min(90, Math.max(1, cfg.get<number>('statusBar.periodDays', 30))),
       costMode: (costMode === 'billed' ? 'billed' : 'value') as CostMode,
+      warnAtPercent: Math.min(99, Math.max(1, cfg.get<number>('statusBar.warnAtPercent', 80))),
+      criticalAtPercent: Math.min(200, Math.max(1, cfg.get<number>('statusBar.criticalAtPercent', 95))),
     };
   }
 
@@ -58,7 +60,7 @@ export class UsageStatusBar {
   }
 
   async refresh(): Promise<void> {
-    const { enabled, periodDays, costMode } = this.config();
+    const { enabled, periodDays, costMode, warnAtPercent, criticalAtPercent } = this.config();
     if (!enabled) return;
 
     try {
@@ -68,6 +70,7 @@ export class UsageStatusBar {
       if (result.authMode === 'none') {
         this.item.text = '$(graph) Cursor Usage';
         this.item.tooltip = 'Cursor Usage: sign into Cursor (or set a session token) to load data. Click to open the dashboard.';
+        this.item.backgroundColor = undefined;
         return;
       }
 
@@ -76,7 +79,23 @@ export class UsageStatusBar {
         ? sumBilledCostDollars(result.events, result.plan)
         : sumTokenCostDollars(result.events);
       const showWhatIfPrefix = costMode === 'value' && freePlan;
-      this.item.text = `$(graph) ${showWhatIfPrefix ? '~' : ''}$${cost.toFixed(2)}`;
+
+      const quota = result.quota;
+      const quotaPct = quota?.limit ? (quota.used / quota.limit) * 100 : null;
+      let severity: 'normal' | 'warning' | 'critical' = 'normal';
+      if (quotaPct != null) {
+        if (quotaPct >= criticalAtPercent) severity = 'critical';
+        else if (quotaPct >= warnAtPercent) severity = 'warning';
+      }
+      this.item.backgroundColor =
+        severity === 'critical'
+          ? new vscode.ThemeColor('statusBarItem.errorBackground')
+          : severity === 'warning'
+            ? new vscode.ThemeColor('statusBarItem.warningBackground')
+            : undefined;
+
+      const icon = severity === 'critical' ? '$(warning)' : severity === 'warning' ? '$(alert)' : '$(graph)';
+      this.item.text = `${icon} ${showWhatIfPrefix ? '~' : ''}$${cost.toFixed(2)}`;
 
       const tooltip = new vscode.MarkdownString(undefined, true);
       tooltip.appendMarkdown(`**Cursor Usage** — last ${periodDays} days\n\n`);
@@ -86,12 +105,43 @@ export class UsageStatusBar {
       tooltip.appendMarkdown(`- ${costLabel}: **$${cost.toFixed(2)}**\n`);
       tooltip.appendMarkdown(`- Requests: **${result.events.length.toLocaleString('en-US')}**\n`);
       if (result.plan?.membershipType) tooltip.appendMarkdown(`- Plan: ${result.plan.membershipType}\n`);
+      if (quota && quota.limit != null) {
+        tooltip.appendMarkdown(
+          `- Plan usage: **${quota.used.toLocaleString('en-US')} / ${quota.limit.toLocaleString('en-US')}** (${quotaPct!.toFixed(0)}%)\n`,
+        );
+        if (quota.resetIso) {
+          const resetDate = new Date(quota.resetIso);
+          if (!Number.isNaN(resetDate.getTime())) {
+            tooltip.appendMarkdown(`- Resets: ${resetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}\n`);
+          }
+        }
+        if (quota.startOfCycleIso) {
+          const sinceMs = new Date(quota.startOfCycleIso).getTime();
+          if (!Number.isNaN(sinceMs)) {
+            const exhaustion = projectExhaustionDate(quota.used, quota.limit, sinceMs);
+            if (exhaustion) {
+              const days = Math.max(0, Math.round((exhaustion.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+              tooltip.appendMarkdown(
+                days <= 0
+                  ? `- ⚠️ At this pace, you've already used your plan's included requests for this cycle\n`
+                  : `- At this pace: **~${days} day${days === 1 ? '' : 's'}** until included requests run out\n`,
+              );
+            }
+          }
+        }
+      } else if (quota) {
+        tooltip.appendMarkdown(`- Plan usage: **${quota.used.toLocaleString('en-US')}** requests this cycle (no fixed limit found)\n`);
+      }
+      if (result.hardLimit) {
+        tooltip.appendMarkdown(`- Spend cap: **$${result.hardLimit.toFixed(2)}**/mo (see dashboard for cycle-to-date billed total)\n`);
+      }
       if (result.email) tooltip.appendMarkdown(`- Account: ${result.email}\n`);
       tooltip.appendMarkdown(`\n_Click to open the dashboard._`);
       this.item.tooltip = tooltip;
     } catch (e: any) {
       this.item.text = '$(graph) Cursor Usage';
       this.item.tooltip = `Cursor Usage: ${e?.message || 'failed to load'} — click to open the dashboard.`;
+      this.item.backgroundColor = undefined;
     }
   }
 

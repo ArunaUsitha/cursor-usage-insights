@@ -28,12 +28,36 @@ export function normModel(name) {
     .replace(/[^a-z0-9.-]/g, '');
 }
 
+/**
+ * Bundled last-known-good rates, used only when the live scrape of
+ * cursor.com/docs/models-and-pricing finds nothing (offline, or the page
+ * layout changed). Approximate by nature — a degraded Simulator/cache-savings
+ * estimate beats a broken one. Consumers should check `pricing.fallback`.
+ */
+const FALLBACK_PRICING = {
+  auto: { input: 1.25, cacheWrite: 1.25, cacheRead: 0.25, output: 6.0 },
+  models: [
+    { display: 'Claude 4.5 Sonnet', input: 3.0, cacheWrite: 3.75, cacheRead: 0.3, output: 15.0 },
+    { display: 'Claude 4.5 Haiku', input: 1.0, cacheWrite: 1.25, cacheRead: 0.1, output: 5.0 },
+    { display: 'GPT-5.2', input: 1.75, cacheWrite: null, cacheRead: 0.18, output: 14.0 },
+    { display: 'Composer 2.5', input: 1.25, cacheWrite: 1.55, cacheRead: 0.13, output: 10.0 },
+  ],
+};
+
+function buildAliasIndex(models) {
+  const aliasIndex = {};
+  for (const [key, aliases] of Object.entries(MODEL_ALIASES)) {
+    for (const a of aliases) aliasIndex[normModel(a)] = key;
+  }
+  for (const m of models) aliasIndex[m.name] = m.name;
+  return aliasIndex;
+}
+
 export function parsePricing(md) {
   const auto = { input: null, cacheWrite: null, cacheRead: null, output: null };
   const models = [];
-  const aliasIndex = {};
 
-  const autoSec = md.match(/### Auto pricing[\s\S]*?(?=###|## )/i);
+  const autoSec = (md || '').match(/### Auto pricing[\s\S]*?(?=###|## )/i);
   if (autoSec) {
     for (const row of autoSec[0].match(/\|\s*([^|]+)\s*\|\s*\$?([\d.]+)\s*\|/g) || []) {
       const [, label, rate] = row.match(/\|\s*([^|]+)\s*\|\s*\$?([\d.]+)\s*\|/) || [];
@@ -48,7 +72,7 @@ export function parsePricing(md) {
     }
   }
 
-  const modelSec = md.match(/### Model pricing[\s\S]*?(?=### Premium|## Plans|$)/i);
+  const modelSec = (md || '').match(/### Model pricing[\s\S]*?(?=### Premium|## Plans|$)/i);
   if (modelSec) {
     for (const line of modelSec[0].split('\n')) {
       if (!line.startsWith('|') || line.includes(':---') || /model/i.test(line.split('|')[1])) continue;
@@ -66,12 +90,18 @@ export function parsePricing(md) {
     }
   }
 
-  for (const [key, aliases] of Object.entries(MODEL_ALIASES)) {
-    for (const a of aliases) aliasIndex[normModel(a)] = key;
+  // Scrape found nothing usable (empty/unreachable doc, or page restructured) — fall back.
+  if (auto.input == null && models.length === 0) {
+    const fallbackModels = FALLBACK_PRICING.models.map((m) => ({ ...m, name: normModel(m.display) }));
+    return {
+      auto: { ...FALLBACK_PRICING.auto },
+      models: fallbackModels,
+      aliasIndex: buildAliasIndex(fallbackModels),
+      fallback: true,
+    };
   }
-  for (const m of models) aliasIndex[m.name] = m.name;
 
-  return { auto, models, aliasIndex };
+  return { auto, models, aliasIndex: buildAliasIndex(models), fallback: false };
 }
 
 export function matchPricing(model, pricing) {
@@ -251,4 +281,21 @@ export function percentile(arr, p) {
   if (!arr.length) return null;
   const sorted = [...arr].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length * p)] || sorted[sorted.length - 1];
+}
+
+/**
+ * Straight-line projection of when `used` will hit `limit`, from the average
+ * daily pace since `sinceMs`. Mirrors service.ts's projectExhaustionDate
+ * (duplicated here so the webview doesn't need a round trip to compute it).
+ */
+export function projectExhaustionDate(used, limit, sinceMs, nowMs = Date.now()) {
+  if (limit == null || limit <= 0 || used <= 0) return null;
+  const elapsedDays = (nowMs - sinceMs) / (24 * 60 * 60 * 1000);
+  if (elapsedDays < 0.5) return null;
+  const perDay = used / elapsedDays;
+  if (perDay <= 0) return null;
+  const remaining = limit - used;
+  if (remaining <= 0) return new Date(nowMs);
+  const daysLeft = remaining / perDay;
+  return new Date(nowMs + daysLeft * 24 * 60 * 60 * 1000);
 }

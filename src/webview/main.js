@@ -18,6 +18,7 @@ import {
   summarize,
   detectBillingMode,
   percentile,
+  projectExhaustionDate,
 } from './logic.js';
 
 const vscode = acquireVsCodeApi();
@@ -162,7 +163,7 @@ function planLabel() {
 }
 
 /** Renders the plan-usage KPI card, or hides it if no quota data was returned. */
-function renderQuota(quota) {
+function renderQuota(quota, hardLimit) {
   const card = $('kpiQuotaCard');
   if (!card) return;
   if (!quota || quota.used == null) {
@@ -172,12 +173,34 @@ function renderQuota(quota) {
   card.classList.remove('hidden');
   const unlimited = quota.limit == null || quota.limit <= 0;
   $('kpiQuota').textContent = unlimited ? fmt.num(quota.used) : `${fmt.num(quota.used)} / ${fmt.num(quota.limit)}`;
+
+  const subParts = [];
   if (unlimited) {
-    $('kpiQuotaSub').textContent = 'Included requests this cycle · no fixed limit found';
+    subParts.push('Included requests this cycle · no fixed limit found');
   } else {
     const pct = (quota.used / quota.limit) * 100;
-    $('kpiQuotaSub').textContent = `${fmt.pct(pct)} of this cycle's included requests`;
+    subParts.push(`${fmt.pct(pct)} of this cycle's included requests`);
   }
+  if (quota.resetIso) {
+    const resetDate = new Date(quota.resetIso);
+    if (!Number.isNaN(resetDate.getTime())) {
+      subParts.push(`Resets ${resetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`);
+    }
+  }
+  if (!unlimited && quota.startOfCycleIso) {
+    const sinceMs = new Date(quota.startOfCycleIso).getTime();
+    if (!Number.isNaN(sinceMs)) {
+      const exhaustion = projectExhaustionDate(quota.used, quota.limit, sinceMs);
+      if (exhaustion) {
+        const days = Math.max(0, Math.round((exhaustion.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+        subParts.push(days <= 0
+          ? 'At this pace: already used up this cycle'
+          : `At this pace: ~${days}d left`);
+      }
+    }
+  }
+  if (hardLimit) subParts.push(`Spend cap $${hardLimit.toFixed(2)}/mo`);
+  $('kpiQuotaSub').textContent = subParts.join(' · ');
 }
 
 /** Events re-mapped so `cost` reflects the active cost mode. */
@@ -831,7 +854,7 @@ async function load() {
     state.all = (usage.events || []).map((raw) => normalize(raw, state.pricing, normOpts));
     state.page = 1;
     destroyCharts();
-    renderQuota(usage.quota);
+    renderQuota(usage.quota, usage.hardLimit);
 
     if (usage.authMode === 'none') {
       showAlert('warn', 'Not signed in. Open Cursor while logged into your account, or run "Cursor Usage: Set Session Token Manually" from the command palette.');
@@ -851,7 +874,10 @@ async function load() {
       $('authLabel').textContent = [usage.email ? `Signed in as ${usage.email}` : null, planLabel()]
         .filter(Boolean).join(' — ');
     }
-    showAlert('info', `Loaded ${state.all.length} requests${usage.email ? ` for ${usage.email}` : ''}${planLabel() ? ` (${planLabel()})` : ''}.`);
+    const fallbackNote = state.pricing.fallback
+      ? ' Using bundled fallback pricing (couldn\'t reach cursor.com\'s pricing page) — cost estimates may be slightly out of date.'
+      : '';
+    showAlert('info', `Loaded ${state.all.length} requests${usage.email ? ` for ${usage.email}` : ''}${planLabel() ? ` (${planLabel()})` : ''}.${fallbackNote}`);
     refresh();
     if (state.appView === 'simulator') refreshSimulator();
     if (state.appView === 'analyze') renderAnalyze();

@@ -17,6 +17,7 @@ import {
   summarize,
   detectBillingMode,
   percentile,
+  projectExhaustionDate,
 } from '../src/webview/logic.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -67,6 +68,21 @@ test('parses model table incl. links and missing cells', () => {
   );
   const gpt = pricing.models.find((m) => m.display === 'GPT-5.2');
   assert.equal(gpt.cacheWrite, null);
+});
+test('real scrape is not flagged as fallback', () => {
+  assert.equal(pricing.fallback, false);
+});
+test('empty/unreachable doc falls back to bundled rates instead of an empty table', () => {
+  const empty = parsePricing('');
+  assert.equal(empty.fallback, true);
+  assert.ok(empty.models.length > 0);
+  assert.equal(empty.auto.input, 1.25);
+  assert.ok(matchPricing('claude-4.5-sonnet', empty));
+});
+test('garbled markdown (page restructured) also falls back', () => {
+  const garbled = parsePricing('# Some unrelated page\n\nNo pricing tables here.');
+  assert.equal(garbled.fallback, true);
+  assert.ok(garbled.models.length > 0);
 });
 
 console.log('matchPricing');
@@ -234,13 +250,18 @@ test('free plan forces 0 regardless of chargedCents', () => {
 });
 
 console.log('api.parseQuotaResponse');
-test('prefers the gpt-4 bucket and passes through startOfMonth', () => {
+test('prefers the gpt-4 bucket, passes through startOfMonth, computes resetIso', () => {
   const quota = api.parseQuotaResponse({
     'gpt-4': { numRequests: 342, maxRequestUsage: 500 },
     'gpt-3.5-turbo': { numRequests: 10, maxRequestUsage: 1000 },
     startOfMonth: '2026-07-01T00:00:00.000Z',
   });
-  assert.deepEqual(quota, { used: 342, limit: 500, startOfCycleIso: '2026-07-01T00:00:00.000Z' });
+  assert.deepEqual(quota, {
+    used: 342,
+    limit: 500,
+    startOfCycleIso: '2026-07-01T00:00:00.000Z',
+    resetIso: '2026-08-01T00:00:00.000Z',
+  });
 });
 test('falls back to any bucket with a limit when gpt-4 is absent', () => {
   const quota = api.parseQuotaResponse({ 'claude-3.5-sonnet': { numRequests: 5, maxRequestUsage: 50 } });
@@ -251,6 +272,35 @@ test('returns null for shapes with no request-quota buckets', () => {
   assert.equal(api.parseQuotaResponse(null), null);
   assert.equal(api.parseQuotaResponse('not an object'), null);
 });
+test('malformed startOfMonth is dropped instead of producing an invalid resetIso', () => {
+  const quota = api.parseQuotaResponse({ 'gpt-4': { numRequests: 1, maxRequestUsage: 10 }, startOfMonth: 'not-a-date' });
+  assert.equal(quota.resetIso, undefined);
+});
+
+console.log('projectExhaustionDate (service.ts and logic.js copies agree)');
+const DAY = 24 * 60 * 60 * 1000;
+for (const [name, fn] of [['service.ts', service.projectExhaustionDate], ['logic.js', projectExhaustionDate]]) {
+  test(`${name}: projects a future date at a steady burn rate`, () => {
+    const now = Date.now();
+    const since = now - 10 * DAY;
+    // 100 used in 10 days = 10/day; 400 left / 10 per day = 40 days out.
+    const result = fn(100, 500, since, now);
+    assert.ok(result);
+    const daysOut = Math.round((result.getTime() - now) / DAY);
+    assert.equal(daysOut, 40);
+  });
+  test(`${name}: already exhausted returns "now"`, () => {
+    const now = Date.now();
+    const result = fn(600, 500, now - 10 * DAY, now);
+    assert.equal(result.getTime(), now);
+  });
+  test(`${name}: no limit, no usage yet, or too little elapsed time returns null`, () => {
+    const now = Date.now();
+    assert.equal(fn(100, null, now - 10 * DAY, now), null);
+    assert.equal(fn(0, 500, now - 10 * DAY, now), null);
+    assert.equal(fn(5, 500, now - DAY / 4, now), null);
+  });
+}
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

@@ -2,7 +2,7 @@
   "name": "cursor-usage-dashboard",
   "displayName": "Cursor Usage Dashboard",
   "description": "Analyze your Cursor token usage: costs, cache savings, model breakdowns, insights, and a cost simulator — right inside Cursor.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "iair",
   "license": "MIT",
   "repository": {
@@ -87,6 +87,20 @@
           "minimum": 1,
           "maximum": 90,
           "description": "How many days back the status bar cost figure covers."
+        },
+        "cursorUsage.statusBar.warnAtPercent": {
+          "type": "number",
+          "default": 80,
+          "minimum": 1,
+          "maximum": 99,
+          "description": "Highlight the status bar (warning color) once this % of your plan's included requests are used."
+        },
+        "cursorUsage.statusBar.criticalAtPercent": {
+          "type": "number",
+          "default": 95,
+          "minimum": 1,
+          "maximum": 200,
+          "description": "Highlight the status bar (error color) once this % of your plan's included requests are used."
         }
       }
     }

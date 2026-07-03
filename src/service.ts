@@ -11,6 +11,7 @@ import {
   RawUsageEvent,
   fetchAdminUsage,
   fetchDashboardUsage,
+  fetchHardLimit,
   fetchMe,
   fetchPlanQuota,
   fetchPricingMarkdown,
@@ -23,6 +24,7 @@ export interface UsageResult {
   email?: string;
   plan?: PlanInfo;
   quota?: PlanQuota;
+  hardLimit?: number | null;
   note?: string;
 }
 
@@ -63,7 +65,7 @@ export class UsageService {
 
     const session = await this.getSession();
     if (session) {
-      const [events, plan, quota] = await Promise.all([
+      const [events, plan, quota, hardLimit] = await Promise.all([
         fetchDashboardUsage(session, startMs, endMs),
         fetchStripeProfile(session).catch((e) => {
           this.log(`Plan lookup failed (non-fatal): ${e?.message || e}`);
@@ -73,9 +75,14 @@ export class UsageService {
           this.log(`Quota lookup failed (non-fatal): ${e?.message || e}`);
           return undefined;
         }),
+        fetchHardLimit(session).catch((e) => {
+          this.log(`Hard-limit lookup failed (non-fatal): ${e?.message || e}`);
+          return undefined;
+        }),
       ]);
       if (plan) this.log(`Plan: ${plan.membershipType}`);
       if (quota) this.log(`Quota: ${quota.used}/${quota.limit ?? '∞'}`);
+      if (hardLimit) this.log(`Hard limit: $${hardLimit}`);
       let email = session.email;
       if (!email) {
         try {
@@ -90,6 +97,7 @@ export class UsageService {
         email,
         plan,
         quota: quota ?? undefined,
+        hardLimit,
         note:
           session.source === 'ide'
             ? 'Signed in with your Cursor IDE session.'
@@ -155,4 +163,26 @@ export function sumBilledCostDollars(events: RawUsageEvent[], plan?: PlanInfo): 
     if (e.chargedCents != null) cents += e.chargedCents;
   }
   return cents / 100;
+}
+
+/**
+ * Straight-line projection of when `used` will hit `limit`, from the average
+ * daily pace since `sinceMs`. Returns null when there's no limit, no usage
+ * yet, or the pace is already flat/negative (can't extrapolate).
+ */
+export function projectExhaustionDate(
+  used: number,
+  limit: number | null | undefined,
+  sinceMs: number,
+  nowMs: number = Date.now(),
+): Date | null {
+  if (limit == null || limit <= 0 || used <= 0) return null;
+  const elapsedDays = (nowMs - sinceMs) / (24 * 60 * 60 * 1000);
+  if (elapsedDays < 0.5) return null;
+  const perDay = used / elapsedDays;
+  if (perDay <= 0) return null;
+  const remaining = limit - used;
+  if (remaining <= 0) return new Date(nowMs);
+  const daysLeft = remaining / perDay;
+  return new Date(nowMs + daysLeft * 24 * 60 * 60 * 1000);
 }

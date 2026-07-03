@@ -9,9 +9,11 @@ This is the extension version of the standalone Cursor Usage Dashboard web app. 
 - **Usage view** — KPI cards (requests, token cost, cache savings, avg/request), a sortable + paginated request log with per-request cache savings and expensive-request highlighting, and analytics charts (daily token cost, cost by model, token volume).
 - **Analyze view** — rule-based findings (model concentration, cache health, cold starts, heavy-output requests, spike requests), spend-by-model and cache panels, top-10 expensive requests, and an **"Ask Cursor Chat" brief builder**: pick a template + data scopes, copy a compact brief, and paste it into Cursor Chat for AI analysis of your own usage.
 - **Simulator** — replay any real request's token profile against other models' published rates ("what would this request have cost on X?"), or price a custom token profile.
-- **Status bar** — live token cost for the last 30 days (configurable); click to open the dashboard. Auto-refreshes.
+- **Status bar** — live token cost for the last 30 days (configurable), color-coded (warning/error background) as you approach your plan's included-request limit, with a burn-rate projection ("~12 days until included requests run out") in the tooltip. Click to open the dashboard. Auto-refreshes, and also syncs immediately whenever you open/refresh the dashboard.
+- **Plan-aware** — detects your plan (Free/Pro/Business/…) and shows a **What-if / Billed** cost toggle: What-if is the API-equivalent value of your tokens (useful for optimizing even on a plan where nothing is actually charged); Billed is what you were actually charged. A 5th KPI card shows plan usage (included requests used/limit, cycle reset date, and the same burn-rate projection) when Cursor exposes that data.
 - Billing-mode aware: handles token-based plans, usage-based plans ($0.04/request-style flat fees shown separately from token cost), and mixed ranges after a plan change.
 - Date presets (today / 7d / 30d / custom), model filter, CSV export.
+- Resilient pricing: if cursor.com's pricing page can't be reached or its layout changes, the dashboard falls back to a small bundled rate table (clearly flagged) instead of breaking cost estimates.
 
 ## How authentication works
 
@@ -49,6 +51,8 @@ In Cursor: open the command palette → **Extensions: Install from VSIX…** →
 | `cursorUsage.statusBar.enabled` | `true` | Show token cost in the status bar |
 | `cursorUsage.refreshIntervalMinutes` | `15` | Status bar refresh cadence |
 | `cursorUsage.statusBar.periodDays` | `30` | Days covered by the status bar figure |
+| `cursorUsage.statusBar.warnAtPercent` | `80` | % of plan quota used before the status bar turns warning-colored |
+| `cursorUsage.statusBar.criticalAtPercent` | `95` | % of plan quota used before the status bar turns error-colored |
 
 ## Development
 
