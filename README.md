@@ -33,6 +33,10 @@ Secrets are stored in VS Code SecretStorage (OS keychain), never in settings fil
 
 ## Install
 
+**From the marketplace (recommended):** open the Extensions view in Cursor (`Ctrl+Shift+X` / `Cmd+Shift+X`), search for **"Cursor Usage Dashboard"**, and click Install. Then run **Cursor Usage: Open Dashboard** from the command palette.
+
+**From a `.vsix` file (manual/offline install):**
+
 ```bash
 npm install
 npm run package        # produces cursor-usage-dashboard-x.y.z.vsix
@@ -70,6 +74,18 @@ npm run watch     # rebuild on change
 ```
 
 Layout: `src/extension.ts` (activation), `src/auth.ts` + `src/authCore.ts` (session resolution), `src/api.ts` (cursor.com client), `src/service.ts` (shared data layer), `src/panel.ts` + `src/html.ts` (webview + RPC bridge), `src/statusBar.ts`, `src/webview/` (dashboard UI: `main.js`, `logic.js`, `styles.css`).
+
+## Publishing (maintainers)
+
+Cursor's built-in Extensions view searches the [Open VSX Registry](https://open-vsx.org), not the Microsoft Marketplace, so that's the one to publish to:
+
+```bash
+npx ovsx create-namespace iair0007 -p <open-vsx-token>   # once, if the namespace isn't claimed yet
+npm run package                                       # builds the .vsix
+npx ovsx publish cursor-usage-dashboard-x.y.z.vsix -p <open-vsx-token>
+```
+
+Get a token from an Open VSX account (sign in with GitHub) under *Settings → Access Tokens*. Bump `version` in `package.json` before each publish.
 
 ## Caveats
 
