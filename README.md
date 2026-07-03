@@ -80,7 +80,7 @@ Layout: `src/extension.ts` (activation), `src/auth.ts` + `src/authCore.ts` (sess
 Cursor's built-in Extensions view searches the [Open VSX Registry](https://open-vsx.org), not the Microsoft Marketplace, so that's the one to publish to:
 
 ```bash
-npx ovsx create-namespace iair -p <open-vsx-token>   # once, if the namespace isn't claimed yet
+npx ovsx create-namespace iair0007 -p <open-vsx-token>   # once, if the namespace isn't claimed yet
 npm run package                                       # builds the .vsix
 npx ovsx publish cursor-usage-dashboard-x.y.z.vsix -p <open-vsx-token>
 ```
