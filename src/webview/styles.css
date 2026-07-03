@@ -438,7 +438,10 @@ input:focus, select:focus, textarea:focus {
 .table-controls { display: flex; align-items: center; gap: 8px; }
 .inline-label { color: var(--muted); font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
 
-.table-scroll { overflow-x: auto; }
+/* overflow-x alone would also clip overflow-y (tooltips popping out of the
+   header row) in some engines — the table never needs vertical scrolling,
+   only horizontal, so keep y visible explicitly. */
+.table-scroll { overflow-x: auto; overflow-y: visible; }
 
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
 
@@ -854,6 +857,13 @@ tfoot td {
   letter-spacing: normal;
   white-space: normal;
   box-shadow: var(--shadow);
+}
+
+/* Header-row tips have nothing above them to pop toward — drop down instead. */
+thead .tip:hover::after,
+thead .tip:focus::after {
+  bottom: auto;
+  top: calc(100% + 6px);
 }
 
 /* ------------------------------------------------------------- responsive */
