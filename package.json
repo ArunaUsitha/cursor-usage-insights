@@ -2,9 +2,10 @@
   "name": "cursor-usage-dashboard",
   "displayName": "Cursor Usage Dashboard",
   "description": "Analyze your Cursor token usage: costs, cache savings, model breakdowns, insights, and a cost simulator — right inside Cursor.",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "publisher": "iair",
   "license": "MIT",
+  "icon": "resources/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/iair0007/cursor-usage"
