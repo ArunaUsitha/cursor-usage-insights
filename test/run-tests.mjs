@@ -277,6 +277,23 @@ test('malformed startOfMonth is dropped instead of producing an invalid resetIso
   assert.equal(quota.resetIso, undefined);
 });
 
+console.log('service.quotaPercentUsed');
+test('limit of 0 is treated as unlimited, not a percentage of 0', () => {
+  // Regression: this used to crash the status bar with "Cannot read
+  // properties of null (reading 'toFixed')" whenever a plan's quota
+  // endpoint returned limit: 0 instead of null/undefined.
+  assert.equal(service.quotaPercentUsed({ used: 5, limit: 0 }), null);
+});
+test('missing/negative limit is also unlimited', () => {
+  assert.equal(service.quotaPercentUsed({ used: 5, limit: null }), null);
+  assert.equal(service.quotaPercentUsed({ used: 5, limit: -1 }), null);
+  assert.equal(service.quotaPercentUsed(undefined), null);
+  assert.equal(service.quotaPercentUsed(null), null);
+});
+test('normal limit computes a percentage', () => {
+  assert.equal(service.quotaPercentUsed({ used: 250, limit: 500 }), 50);
+});
+
 console.log('projectExhaustionDate (service.ts and logic.js copies agree)');
 const DAY = 24 * 60 * 60 * 1000;
 for (const [name, fn] of [['service.ts', service.projectExhaustionDate], ['logic.js', projectExhaustionDate]]) {

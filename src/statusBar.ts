@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { UsageService, projectExhaustionDate, sumBilledCostDollars, sumTokenCostDollars } from './service';
+import { UsageService, projectExhaustionDate, quotaPercentUsed, sumBilledCostDollars, sumTokenCostDollars } from './service';
 
 type CostMode = 'value' | 'billed';
 
@@ -81,7 +81,8 @@ export class UsageStatusBar {
       const showWhatIfPrefix = costMode === 'value' && freePlan;
 
       const quota = result.quota;
-      const quotaPct = quota?.limit ? (quota.used / quota.limit) * 100 : null;
+      const quotaPct = quotaPercentUsed(quota);
+      const hasQuotaLimit = quotaPct != null;
       let severity: 'normal' | 'warning' | 'critical' = 'normal';
       if (quotaPct != null) {
         if (quotaPct >= criticalAtPercent) severity = 'critical';
@@ -105,9 +106,9 @@ export class UsageStatusBar {
       tooltip.appendMarkdown(`- ${costLabel}: **$${cost.toFixed(2)}**\n`);
       tooltip.appendMarkdown(`- Requests: **${result.events.length.toLocaleString('en-US')}**\n`);
       if (result.plan?.membershipType) tooltip.appendMarkdown(`- Plan: ${result.plan.membershipType}\n`);
-      if (quota && quota.limit != null) {
+      if (quota && hasQuotaLimit) {
         tooltip.appendMarkdown(
-          `- Plan usage: **${quota.used.toLocaleString('en-US')} / ${quota.limit.toLocaleString('en-US')}** (${quotaPct!.toFixed(0)}%)\n`,
+          `- Plan usage: **${quota.used.toLocaleString('en-US')} / ${quota.limit!.toLocaleString('en-US')}** (${quotaPct!.toFixed(0)}%)\n`,
         );
         if (quota.resetIso) {
           const resetDate = new Date(quota.resetIso);

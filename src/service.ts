@@ -166,6 +166,17 @@ export function sumBilledCostDollars(events: RawUsageEvent[], plan?: PlanInfo): 
 }
 
 /**
+ * % of a plan quota used, or null when there's no real limit to divide by.
+ * `limit` can come back as 0 (not just null/undefined) for some plans —
+ * treat both as "unlimited" so callers never do 0-limit division or format
+ * a null percentage.
+ */
+export function quotaPercentUsed(quota: PlanQuota | null | undefined): number | null {
+  if (quota?.limit == null || quota.limit <= 0) return null;
+  return (quota.used / quota.limit) * 100;
+}
+
+/**
  * Straight-line projection of when `used` will hit `limit`, from the average
  * daily pace since `sinceMs`. Returns null when there's no limit, no usage
  * yet, or the pace is already flat/negative (can't extrapolate).
