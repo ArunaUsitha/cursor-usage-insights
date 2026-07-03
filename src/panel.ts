@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { UsageService } from './service';
+import { UsageStatusBar } from './statusBar';
 import { getDashboardHtml } from './html';
 
 interface RpcMessage {
@@ -13,7 +14,7 @@ export class DashboardPanel {
   public static current: DashboardPanel | undefined;
   private disposables: vscode.Disposable[] = [];
 
-  static show(context: vscode.ExtensionContext, service: UsageService): void {
+  static show(context: vscode.ExtensionContext, service: UsageService, statusBar?: UsageStatusBar): void {
     if (DashboardPanel.current) {
       DashboardPanel.current.panel.reveal();
       return;
@@ -28,7 +29,7 @@ export class DashboardPanel {
         localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')],
       },
     );
-    DashboardPanel.current = new DashboardPanel(panel, context, service);
+    DashboardPanel.current = new DashboardPanel(panel, context, service, statusBar);
   }
 
   static refresh(): void {
@@ -39,6 +40,7 @@ export class DashboardPanel {
     private readonly panel: vscode.WebviewPanel,
     private readonly context: vscode.ExtensionContext,
     private readonly service: UsageService,
+    private readonly statusBar?: UsageStatusBar,
   ) {
     panel.webview.html = getDashboardHtml(panel.webview, context.extensionUri);
     panel.onDidDispose(() => this.dispose(), null, this.disposables);
@@ -71,7 +73,11 @@ export class DashboardPanel {
         const start = Number(params.startDate);
         const end = Number(params.endDate);
         if (!start || !end) throw new Error('startDate and endDate required (epoch ms)');
-        return this.service.getUsage(start, end);
+        const result = await this.service.getUsage(start, end);
+        // Sync the status bar to whatever the user just saw, instead of
+        // waiting for its own timer (avoids the two showing different counts).
+        void this.statusBar?.refresh();
+        return result;
       }
       case 'pricing':
         return { markdown: await this.service.getPricingMarkdown() };

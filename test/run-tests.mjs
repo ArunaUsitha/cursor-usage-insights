@@ -217,5 +217,21 @@ test('numeric cents pass through; "-" cost is null', () => {
   assert.equal(api.toRawEvent({ usageBasedCosts: '-', model: 'x' }).chargedCents, null);
 });
 
+console.log('service.sumBilledCostDollars');
+const service = await loadTs('src/service.ts', 'service.mjs');
+test('sums chargedCents, zeroing included/errored kinds', () => {
+  const events = [
+    api.toRawEvent({ chargedCents: 100, model: 'x' }),
+    api.toRawEvent({ chargedCents: 200, kind: 'Included in Pro', model: 'x' }),
+    api.toRawEvent({ chargedCents: 300, kind: 'Errored, Not Charged', model: 'x' }),
+  ];
+  assert.equal(service.sumBilledCostDollars(events), 1.0);
+});
+test('free plan forces 0 regardless of chargedCents', () => {
+  const events = [api.toRawEvent({ chargedCents: 500, model: 'x' })];
+  assert.equal(service.sumBilledCostDollars(events, { membershipType: 'free' }), 0);
+  assert.equal(service.sumBilledCostDollars(events, { membershipType: 'pro' }), 5.0);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

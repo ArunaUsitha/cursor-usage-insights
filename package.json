@@ -2,7 +2,7 @@
   "name": "cursor-usage-dashboard",
   "displayName": "Cursor Usage Dashboard",
   "description": "Analyze your Cursor token usage: costs, cache savings, model breakdowns, insights, and a cost simulator — right inside Cursor.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "iair",
   "license": "MIT",
   "repository": {
@@ -61,6 +61,19 @@
           "type": "boolean",
           "default": true,
           "description": "Show current period token cost in the status bar."
+        },
+        "cursorUsage.statusBar.costMode": {
+          "type": "string",
+          "enum": [
+            "value",
+            "billed"
+          ],
+          "enumDescriptions": [
+            "API-equivalent value of your tokens, even on plans/requests where nothing is actually charged.",
+            "What you were actually billed (0 on free plans and for included/errored requests)."
+          ],
+          "default": "value",
+          "description": "Whether the status bar shows the what-if token value or the actually billed cost."
         },
         "cursorUsage.refreshIntervalMinutes": {
           "type": "number",

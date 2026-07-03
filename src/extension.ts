@@ -18,7 +18,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('cursorUsage.openDashboard', () => {
-      DashboardPanel.show(context, service);
+      DashboardPanel.show(context, service, statusBar);
     }),
 
     vscode.commands.registerCommand('cursorUsage.showLogs', () => {

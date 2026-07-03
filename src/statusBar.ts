@@ -1,5 +1,17 @@
 import * as vscode from 'vscode';
-import { UsageService, sumTokenCostDollars } from './service';
+import { UsageService, sumBilledCostDollars, sumTokenCostDollars } from './service';
+
+type CostMode = 'value' | 'billed';
+
+/** Calendar-day window matching the dashboard's date presets (not a raw ms rollback). */
+function dayWindow(periodDays: number): { start: number; end: number } {
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (periodDays - 1));
+  return { start: start.getTime(), end: end.getTime() };
+}
 
 export class UsageStatusBar {
   private item: vscode.StatusBarItem;
@@ -22,10 +34,12 @@ export class UsageStatusBar {
 
   private config() {
     const cfg = vscode.workspace.getConfiguration('cursorUsage');
+    const costMode = cfg.get<string>('statusBar.costMode', 'value');
     return {
       enabled: cfg.get<boolean>('statusBar.enabled', true),
       intervalMinutes: Math.max(5, cfg.get<number>('refreshIntervalMinutes', 15)),
       periodDays: Math.min(90, Math.max(1, cfg.get<number>('statusBar.periodDays', 30))),
+      costMode: (costMode === 'billed' ? 'billed' : 'value') as CostMode,
     };
   }
 
@@ -44,12 +58,11 @@ export class UsageStatusBar {
   }
 
   async refresh(): Promise<void> {
-    const { enabled, periodDays } = this.config();
+    const { enabled, periodDays, costMode } = this.config();
     if (!enabled) return;
 
     try {
-      const end = Date.now();
-      const start = end - periodDays * 24 * 60 * 60 * 1000;
+      const { start, end } = dayWindow(periodDays);
       const result = await this.service.getUsage(start, end);
 
       if (result.authMode === 'none') {
@@ -58,13 +71,19 @@ export class UsageStatusBar {
         return;
       }
 
-      const cost = sumTokenCostDollars(result.events);
       const freePlan = result.plan?.membershipType?.startsWith('free') ?? false;
-      this.item.text = `$(graph) ${freePlan ? '~' : ''}$${cost.toFixed(2)}`;
+      const cost = costMode === 'billed'
+        ? sumBilledCostDollars(result.events, result.plan)
+        : sumTokenCostDollars(result.events);
+      const showWhatIfPrefix = costMode === 'value' && freePlan;
+      this.item.text = `$(graph) ${showWhatIfPrefix ? '~' : ''}$${cost.toFixed(2)}`;
 
       const tooltip = new vscode.MarkdownString(undefined, true);
       tooltip.appendMarkdown(`**Cursor Usage** — last ${periodDays} days\n\n`);
-      tooltip.appendMarkdown(`- Token ${freePlan ? 'value (what-if, not billed)' : 'cost'}: **$${cost.toFixed(2)}**\n`);
+      const costLabel = costMode === 'billed'
+        ? 'Billed cost'
+        : `Token ${freePlan ? 'value (what-if, not billed)' : 'cost'}`;
+      tooltip.appendMarkdown(`- ${costLabel}: **$${cost.toFixed(2)}**\n`);
       tooltip.appendMarkdown(`- Requests: **${result.events.length.toLocaleString('en-US')}**\n`);
       if (result.plan?.membershipType) tooltip.appendMarkdown(`- Plan: ${result.plan.membershipType}\n`);
       if (result.email) tooltip.appendMarkdown(`- Account: ${result.email}\n`);

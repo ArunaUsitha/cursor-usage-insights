@@ -108,9 +108,11 @@ export class UsageService {
 }
 
 /**
- * Minimal event cost sum for the status bar; mirrors the webview normalize()
+ * What-if event cost sum for the status bar; mirrors the webview normalize()
  * priority: token-based plans bill chargedCents, otherwise model token cost
- * (tokenUsage.totalCents + cursorTokenFee), otherwise chargedCents.
+ * (tokenUsage.totalCents + cursorTokenFee), otherwise chargedCents. This is
+ * the API-equivalent value of the tokens, not what the user was actually
+ * charged — see sumBilledCostDollars for that.
  */
 export function sumTokenCostDollars(events: RawUsageEvent[]): number {
   let cents = 0;
@@ -122,6 +124,26 @@ export function sumTokenCostDollars(events: RawUsageEvent[]): number {
     if (e.isTokenBasedCall && e.chargedCents != null) cents += e.chargedCents;
     else if (modelCents != null) cents += modelCents;
     else if (e.chargedCents != null) cents += e.chargedCents;
+  }
+  return cents / 100;
+}
+
+const FREE_KIND_RE = /included|free|not charged|no charge|errored/i;
+
+/**
+ * Actually-billed cost sum; ports the webview logic.js normalize() billedCost
+ * rule so the status bar can show it without depending on the webview: free
+ * plans are never billed, included/free/errored events are always 0, and
+ * everything else bills chargedCents.
+ */
+export function sumBilledCostDollars(events: RawUsageEvent[], plan?: PlanInfo): number {
+  const freePlan = plan?.membershipType?.startsWith('free') ?? false;
+  if (freePlan) return 0;
+
+  let cents = 0;
+  for (const e of events) {
+    if (e.kind && FREE_KIND_RE.test(e.kind)) continue;
+    if (e.chargedCents != null) cents += e.chargedCents;
   }
   return cents / 100;
 }
