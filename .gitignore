@@ -1,0 +1,8 @@
+node_modules/
+dist/
+media/main.js
+media/styles.css
+media/sql-wasm.wasm
+*.vsix
+.DS_Store
+test/.build/
