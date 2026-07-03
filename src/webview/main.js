@@ -1702,10 +1702,23 @@ async function copyCursorBrief() {
   if (!text) return;
   try {
     await rpc('copyText', { text });
+    // Best-effort: also try to bring Cursor's chat panel into focus so
+    // there's less to hunt for. Never populates or sends the prompt itself —
+    // there's no reliable way to do that across Cursor versions, and doing
+    // it wrong could submit an unreviewed prompt on the user's behalf. Falls
+    // back to the plain "paste it yourself" message if unsupported here.
+    let opened = false;
+    try {
+      opened = Boolean((await rpc('focusCursorChat')).opened);
+    } catch {
+      opened = false;
+    }
     const status = $('copyBriefStatus');
     if (status) {
-      status.textContent = 'Copied — paste in Cursor Chat';
-      setTimeout(() => { status.textContent = ''; }, 3000);
+      status.textContent = opened
+        ? 'Copied — Cursor Chat is open, press ⌘/Ctrl+V then Enter'
+        : 'Copied — paste in Cursor Chat';
+      setTimeout(() => { status.textContent = ''; }, 4000);
     }
   } catch {
     $('analyzeBriefPreview').value = text;

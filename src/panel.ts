@@ -14,7 +14,12 @@ export class DashboardPanel {
   public static current: DashboardPanel | undefined;
   private disposables: vscode.Disposable[] = [];
 
-  static show(context: vscode.ExtensionContext, service: UsageService, statusBar?: UsageStatusBar): void {
+  static show(
+    context: vscode.ExtensionContext,
+    service: UsageService,
+    statusBar?: UsageStatusBar,
+    log: (msg: string) => void = () => {},
+  ): void {
     if (DashboardPanel.current) {
       DashboardPanel.current.panel.reveal();
       return;
@@ -29,7 +34,7 @@ export class DashboardPanel {
         localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')],
       },
     );
-    DashboardPanel.current = new DashboardPanel(panel, context, service, statusBar);
+    DashboardPanel.current = new DashboardPanel(panel, context, service, statusBar, log);
   }
 
   static refresh(): void {
@@ -41,6 +46,7 @@ export class DashboardPanel {
     private readonly context: vscode.ExtensionContext,
     private readonly service: UsageService,
     private readonly statusBar?: UsageStatusBar,
+    private readonly log: (msg: string) => void = () => {},
   ) {
     panel.webview.html = getDashboardHtml(panel.webview, context.extensionUri);
     panel.onDidDispose(() => this.dispose(), null, this.disposables);
@@ -84,11 +90,38 @@ export class DashboardPanel {
       case 'copyText':
         await vscode.env.clipboard.writeText(String(params.text ?? ''));
         return { ok: true };
+      case 'focusCursorChat':
+        return { opened: await this.focusCursorChat() };
       case 'exportCsv':
         return this.saveCsv(String(params.csv ?? ''), String(params.filename || 'cursor-usage.csv'));
       default:
         throw new Error(`Unknown method: ${method}`);
     }
+  }
+
+  /**
+   * Best-effort attempt to bring Cursor's own chat/composer panel into focus
+   * so the user only has to paste, instead of also hunting for the panel.
+   * There is no documented, stable API for this — Cursor doesn't support
+   * VS Code's own `workbench.action.chat.open`, and no third-party extension
+   * has a confirmed way to pass prompt text into Cursor's chat. So this only
+   * tries to *open/focus* the panel (never to populate or submit a prompt,
+   * which could otherwise send a request on the user's behalf without them
+   * reviewing it first) and silently no-ops if none of the candidate
+   * commands exist on this Cursor version.
+   */
+  private async focusCursorChat(): Promise<boolean> {
+    const candidates = ['composer.createNewComposerTab', 'aichat.newchataction', 'workbench.action.chat.open'];
+    for (const command of candidates) {
+      try {
+        await vscode.commands.executeCommand(command);
+        this.log(`focusCursorChat: opened chat via "${command}"`);
+        return true;
+      } catch (e: any) {
+        this.log(`focusCursorChat: "${command}" unavailable (${e?.message || e})`);
+      }
+    }
+    return false;
   }
 
   private async saveCsv(csv: string, filename: string): Promise<{ ok: boolean; path?: string }> {
