@@ -25,9 +25,11 @@ The dashboard has four tabs, ordered from simple to detailed:
 
 Priority order (same as the original web app's proxy):
 
-1. **Cursor IDE session (default, zero setup)** — Cursor stores your session token locally in its `state.vscdb` database when you sign in. The extension reads it (read-only, via WebAssembly SQLite — no native deps) and calls the same cursor.com dashboard APIs the official usage page uses.
+1. **Cursor IDE session (default, zero setup)** — Cursor stores your session token locally in its `state.vscdb` database when you sign in. The extension reads it read-only, preferring the native `sqlite3` CLI (streams from disk, so it works even on multi-GB `state.vscdb` files) and falling back to a bundled WebAssembly SQLite for small DBs when the CLI isn't on PATH. It then calls the same cursor.com dashboard APIs the official usage page uses.
 2. **Team Admin API key** — run *"Cursor Usage: Set Team Admin API Key"* (requires a Teams/Business plan) to see team-wide usage via the official Admin API.
 3. **Manual session token** — if the local DB can't be read, run *"Cursor Usage: Set Session Token Manually"* and paste the `WorkosCursorSessionToken` cookie value from cursor.com (DevTools → Application → Cookies).
+
+> `sqlite3` ships preinstalled on macOS and virtually every Linux distro; on Windows 10/11 it's usually available too (`winget install SQLite.SQLite` otherwise). If the extension logs `Skipping WASM SQLite fallback ... too large for sql.js`, install the CLI and reload the window — the WASM path can't hold multi-GB DBs in memory.
 
 Secrets are stored in VS Code SecretStorage (OS keychain), never in settings files. *"Cursor Usage: Clear Stored Credentials"* removes them.
 

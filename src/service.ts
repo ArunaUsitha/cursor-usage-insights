@@ -42,7 +42,7 @@ export class UsageService {
   ) {}
 
   async getSession(): Promise<CursorSession | null> {
-    const session = await resolveSession(this.context);
+    const session = await resolveSession(this.context, this.log);
     this.log(session
       ? `Session resolved (source: ${session.source}, user: ${session.userId}${session.email ? `, email: ${session.email}` : ''})`
       : 'No Cursor session found (state.vscdb unreadable or missing token, no manual token stored)');

@@ -2,7 +2,9 @@
 // Run: npm test
 
 import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { build } from 'esbuild';
@@ -40,7 +42,19 @@ let passed = 0;
 let failed = 0;
 function test(name, fn) {
   try {
-    fn();
+    const maybe = fn();
+    if (maybe && typeof maybe.then === 'function') {
+      return maybe.then(
+        () => {
+          passed++;
+          console.log(`  ✓ ${name}`);
+        },
+        (e) => {
+          failed++;
+          console.error(`  ✗ ${name}\n    ${e.message}`);
+        },
+      );
+    }
     passed++;
     console.log(`  ✓ ${name}`);
   } catch (e) {
@@ -320,6 +334,52 @@ for (const [name, fn] of [['service.ts', service.projectExhaustionDate], ['logic
     assert.equal(fn(0, 500, now - 10 * DAY, now), null);
     assert.equal(fn(5, 500, now - DAY / 4, now), null);
   });
+}
+
+// --- sqlite3 CLI reader ---------------------------------------------------
+// Exercises the same code path resolveSession() takes when Cursor's state.vscdb
+// is too large for sql.js. Skipped automatically when sqlite3 is not on PATH.
+
+const sqliteAvailable = spawnSync('sqlite3', ['-version']).status === 0;
+console.log('auth.readValuesViaSqliteCli' + (sqliteAvailable ? '' : ' (skipped: sqlite3 CLI not on PATH)'));
+
+if (sqliteAvailable) {
+  const auth = await loadTs('src/auth.ts', 'auth.mjs');
+  const tmp = mkdtempSync(path.join(tmpdir(), 'cursor-usage-auth-'));
+  const dbFile = path.join(tmp, 'state.vscdb');
+  try {
+    execFileSync('sqlite3', [
+      dbFile,
+      'CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value TEXT);',
+      "INSERT INTO ItemTable VALUES ('cursorAuth/accessToken', 'header.payload.sig');",
+      "INSERT INTO ItemTable VALUES ('cursorAuth/cachedEmail', 'user@example.com');",
+      "INSERT INTO ItemTable VALUES ('other/key', 'ignore-me');",
+    ]);
+
+    await test('reads requested keys and ignores others', async () => {
+      const values = await auth.readValuesViaSqliteCli(dbFile, [
+        'cursorAuth/accessToken',
+        'cursorAuth/cachedEmail',
+      ]);
+      assert.equal(values.get('cursorAuth/accessToken'), 'header.payload.sig');
+      assert.equal(values.get('cursorAuth/cachedEmail'), 'user@example.com');
+      assert.equal(values.has('other/key'), false);
+    });
+
+    await test('missing key resolves to a Map without that entry (not an error)', async () => {
+      const values = await auth.readValuesViaSqliteCli(dbFile, ['does/not/exist']);
+      assert.equal(values.size, 0);
+    });
+
+    await test('rejects with a descriptive error when the DB file is missing', async () => {
+      await assert.rejects(
+        () => auth.readValuesViaSqliteCli(path.join(tmp, 'missing.vscdb'), ['x']),
+        /sqlite3 CLI failed/,
+      );
+    });
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);
