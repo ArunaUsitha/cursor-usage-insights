@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { UsageService, projectExhaustionDate, quotaPercentUsed, statusBarText, sumBilledCostDollars, sumTokenCostDollars } from './service';
+import { UsageService, countRequests, projectExhaustionDate, quotaPercentUsed, statusBarText, sumBilledCostDollars, sumTokenCostDollars } from './service';
 
 type CostMode = 'value' | 'billed';
 
@@ -103,7 +103,7 @@ export class UsageStatusBar {
         ? 'Billed cost'
         : `Token ${freePlan ? 'value (what-if, not billed)' : 'cost'}`;
       tooltip.appendMarkdown(`- ${costLabel}: **$${cost.toFixed(2)}**\n`);
-      tooltip.appendMarkdown(`- Requests: **${result.events.length.toLocaleString('en-US')}**\n`);
+      tooltip.appendMarkdown(`- Requests: **${countRequests(result.events).toLocaleString('en-US')}**\n`);
       if (result.plan?.membershipType) tooltip.appendMarkdown(`- Plan: ${result.plan.membershipType}\n`);
       if (quota && hasQuotaLimit) {
         const overLimit = quota.used > quota.limit!;

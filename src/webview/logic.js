@@ -227,6 +227,7 @@ export function normalize(raw, pricing, opts = {}) {
     modelRaw,
     model: displayModel(modelRaw),
     kind: raw.kind || null,
+    counted: isCountedRequest(raw.kind, totalTokens, chargedCents),
     cost,
     valueCost: cost,
     billedCost,
@@ -245,6 +246,22 @@ export function normalize(raw, pricing, opts = {}) {
   };
 }
 
+const NOT_COUNTED_KIND_RE = /errored|aborted|cancel/i;
+
+/**
+ * Whether cursor.com's own usage page would count this event as a request.
+ * The dashboard events API returns every event row — including errored or
+ * aborted generations and bookkeeping rows with no tokens and no charge —
+ * while the official "requests" figures skip those, so counting raw rows
+ * overstates requests. Mirrored in service.ts (countRequests) so the status
+ * bar agrees without a round trip.
+ */
+export function isCountedRequest(kind, totalTokens, chargedCents) {
+  if (kind && NOT_COUNTED_KIND_RE.test(String(kind))) return false;
+  if (!(totalTokens > 0) && !(chargedCents > 0)) return false;
+  return true;
+}
+
 export function detectBillingMode(events) {
   const tokenBased = events.filter((e) => e.isTokenBased).length;
   const usageBased = events.filter((e) => !e.isTokenBased && e.requestCharge != null).length;
@@ -255,6 +272,7 @@ export function detectBillingMode(events) {
 }
 
 export function summarize(events) {
+  const countedEvents = events.filter((e) => e.counted !== false);
   const withCost = events.filter((e) => e.cost != null);
   const totalCost = withCost.reduce((s, e) => s + e.cost, 0);
   const totalSavings = events.filter((e) => e.cacheSavings != null).reduce((s, e) => s + e.cacheSavings, 0);
@@ -264,7 +282,9 @@ export function summarize(events) {
     && Math.abs(e.requestCharge - e.tokenCost) > 0.001);
   const billingMode = detectBillingMode(events);
   return {
-    count: events.length,
+    count: countedEvents.length,
+    eventCount: events.length,
+    notCounted: events.length - countedEvents.length,
     withCost: withCost.length,
     totalCost,
     totalSavings,

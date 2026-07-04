@@ -765,13 +765,16 @@ function tip(text) {
 }
 
 function renderKpis(summary) {
-  const isFiltered = summary.count < state.all.length;
+  const isFiltered = summary.eventCount < state.all.length;
 
   $('kpiRequests').textContent = fmt.num(summary.count);
   const noCacheEst = summary.costMode === 'billed'
     ? summary.valueTotal + summary.totalSavings
     : summary.noCache;
   $('kpiRequestsSub').innerHTML = `Est. without cache: ${fmt.money(noCacheEst)} ${tip('What the token value would have been if every cache-read token was billed at full input-token price instead of the discounted cache-read rate. Always based on what-if pricing.')}`;
+  if (summary.notCounted > 0) {
+    $('kpiRequestsSub').innerHTML += `<br><span class="kpi-muted">+ ${fmt.num(summary.notCounted)} errored/aborted/no-op events not counted ${tip('The events API also returns errored or aborted generations and rows with no tokens and no charge. Cursor\'s own usage page doesn\'t count those as requests, so neither does this number. They still appear in the request log below.')}</span>`;
+  }
   if (isFiltered) {
     $('kpiRequestsSub').innerHTML += `<br><span class="kpi-muted">Filtered from ${fmt.num(state.all.length)} total</span>`;
   }
@@ -872,7 +875,7 @@ function renderTable(events, summary) {
     ${feeCol}
     <td class="savings">${fmt.money(pageSavings)}</td>
     <td colspan="6" style="text-align:right;color:var(--muted)">
-      Grand total: ${fmt.num(summary.count)} requests · ${fmt.money(summary.totalCost)} token cost
+      Grand total: ${fmt.num(summary.count)} requests${summary.notCounted > 0 ? ` (${fmt.num(summary.eventCount)} events)` : ''} · ${fmt.money(summary.totalCost)} token cost
       ${summary.hasUsageFees ? ` · ${fmt.money(summary.totalRequestFees)} usage fees` : ''}
     </td>
   </tr>`;
@@ -1077,7 +1080,9 @@ function renderOverview() {
     : '';
 
   $('ovRequests').textContent = fmt.num(summary.count);
-  $('ovRequestsSub').textContent = summary.count ? `${fmt.num(summary.withCost)} with cost data` : 'No requests in this period';
+  $('ovRequestsSub').textContent = summary.count
+    ? `${fmt.num(summary.withCost)} with cost data${summary.notCounted > 0 ? ` · ${fmt.num(summary.notCounted)} errored/aborted not counted` : ''}`
+    : 'No requests in this period';
 
   $('ovSavings').textContent = fmt.money(summary.totalSavings);
   const savingsPct = summary.noCache > 0 ? (summary.totalSavings / summary.noCache) * 100 : null;
@@ -1162,7 +1167,11 @@ async function load() {
     const fallbackNote = state.pricing.fallback
       ? ' Using bundled fallback pricing (couldn\'t reach cursor.com\'s pricing page) — cost estimates may be slightly out of date.'
       : '';
-    showAlert('info', `Loaded ${state.all.length} requests${usage.email ? ` for ${usage.email}` : ''}${planLabel() ? ` (${planLabel()})` : ''}.${fallbackNote}`);
+    const countedAll = state.all.filter((e) => e.counted !== false).length;
+    const loadedLabel = countedAll < state.all.length
+      ? `Loaded ${countedAll} requests (${state.all.length} events incl. errored/aborted)`
+      : `Loaded ${state.all.length} requests`;
+    showAlert('info', `${loadedLabel}${usage.email ? ` for ${usage.email}` : ''}${planLabel() ? ` (${planLabel()})` : ''}.${fallbackNote}`);
     refresh();
     if (state.appView === 'overview') renderOverview();
     if (state.appView === 'simulator') refreshSimulator();
@@ -1559,7 +1568,7 @@ function buildBriefSectionSummary(data, events) {
   const presetLabels = { today: 'Today', '7d': '7 days', '30d': '30 days', custom: 'Custom' };
   const lines = [
     `- Period: ${presetLabels[state.datePreset] || 'Custom'} (${$('startDate').value} to ${$('endDate').value})`,
-    `- Requests: ${summary.count}${events.length < state.all.length ? ` (filtered from ${state.all.length} loaded)` : ''}`,
+    `- Requests: ${summary.count}${summary.notCounted > 0 ? ` (+${summary.notCounted} errored/aborted events excluded)` : ''}${events.length < state.all.length ? ` (filtered from ${state.all.length} loaded)` : ''}`,
     `- Token cost: ${fmt.money(summary.totalCost)}`,
     `- Avg token cost / request: ${fmt.money(summary.avg)}`,
     `- Cache savings (est.): ${fmt.money(summary.totalSavings)}`,

@@ -147,6 +147,28 @@ export function sumTokenCostDollars(events: RawUsageEvent[]): number {
 
 const FREE_KIND_RE = /included|free|not charged|no charge|errored/i;
 
+const NOT_COUNTED_KIND_RE = /errored|aborted|cancel/i;
+
+/**
+ * Requests as cursor.com's own usage page counts them. The events API also
+ * returns errored/aborted generations and bookkeeping rows with no tokens
+ * and no charge, which the official request figures skip — counting raw
+ * rows overstates requests (e.g. 210 events vs 138 official requests).
+ * Mirrors logic.js isCountedRequest so the status bar and dashboard agree.
+ */
+export function countRequests(events: RawUsageEvent[]): number {
+  let n = 0;
+  for (const e of events) {
+    if (e.kind && NOT_COUNTED_KIND_RE.test(e.kind)) continue;
+    const tu = e.tokenUsage;
+    const totalTokens =
+      (tu?.inputTokens ?? 0) + (tu?.outputTokens ?? 0) + (tu?.cacheReadTokens ?? 0) + (tu?.cacheWriteTokens ?? 0);
+    if (!(totalTokens > 0) && !((e.chargedCents ?? 0) > 0)) continue;
+    n++;
+  }
+  return n;
+}
+
 /**
  * Actually-billed cost sum; ports the webview logic.js normalize() billedCost
  * rule so the status bar can show it without depending on the webview: free

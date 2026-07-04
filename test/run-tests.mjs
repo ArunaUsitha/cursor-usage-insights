@@ -18,6 +18,7 @@ import {
   normalize,
   summarize,
   detectBillingMode,
+  isCountedRequest,
   percentile,
   projectExhaustionDate,
 } from '../src/webview/logic.js';
@@ -289,6 +290,42 @@ test('returns null for shapes with no request-quota buckets', () => {
 test('malformed startOfMonth is dropped instead of producing an invalid resetIso', () => {
   const quota = api.parseQuotaResponse({ 'gpt-4': { numRequests: 1, maxRequestUsage: 10 }, startOfMonth: 'not-a-date' });
   assert.equal(quota.resetIso, undefined);
+});
+
+console.log('isCountedRequest / request counting (logic.js + service.ts agree)');
+test('errored/aborted/cancelled kinds are not counted as requests', () => {
+  assert.equal(isCountedRequest('Errored, Not Charged', 5000, null), false);
+  assert.equal(isCountedRequest('Aborted, Not Charged', 5000, null), false);
+  assert.equal(isCountedRequest('Cancelled', 5000, null), false);
+  assert.equal(isCountedRequest('Included in Pro', 5000, null), true);
+  assert.equal(isCountedRequest('Usage-based', 5000, 123), true);
+});
+test('rows with no tokens and no charge are bookkeeping, not requests', () => {
+  assert.equal(isCountedRequest(null, 0, null), false);
+  assert.equal(isCountedRequest('Included in Pro', 0, 0), false);
+  assert.equal(isCountedRequest(null, 0, 4), true); // flat-fee row, no token data
+  assert.equal(isCountedRequest(null, 100, null), true);
+});
+test('summarize separates counted requests from raw event rows', () => {
+  const events = [
+    normalize(api.toRawEvent({ model: 'x', kind: 'Included in Pro', tokenUsage: { inputTokens: 10, totalCents: 1 } }), pricing),
+    normalize(api.toRawEvent({ model: 'x', kind: 'Errored, Not Charged', tokenUsage: { inputTokens: 10, totalCents: 1 } }), pricing),
+    normalize(api.toRawEvent({ model: 'x', kind: 'Included in Pro' }), pricing),
+  ];
+  const s = summarize(events);
+  assert.equal(s.count, 1);
+  assert.equal(s.eventCount, 3);
+  assert.equal(s.notCounted, 2);
+});
+test('service.countRequests applies the same rules to raw events', () => {
+  const events = [
+    api.toRawEvent({ model: 'x', kind: 'Included in Pro', tokenUsage: { inputTokens: 10 } }),
+    api.toRawEvent({ model: 'x', kind: 'Errored, Not Charged', tokenUsage: { inputTokens: 10 } }),
+    api.toRawEvent({ model: 'x', kind: 'Aborted' }),
+    api.toRawEvent({ model: 'x', chargedCents: 4 }),
+    api.toRawEvent({ model: 'x' }),
+  ];
+  assert.equal(service.countRequests(events), 2);
 });
 
 console.log('service.statusBarText');
