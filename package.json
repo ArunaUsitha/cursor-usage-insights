@@ -2,13 +2,17 @@
   "name": "cursor-usage-dashboard",
   "displayName": "Cursor Usage Dashboard",
   "description": "Analyze your Cursor token usage: costs, cache savings, model breakdowns, insights, and a cost simulator — right inside Cursor.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "iair0007",
   "license": "MIT",
   "icon": "resources/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/iair0007/cursor-usage"
+  },
+  "homepage": "https://github.com/iair0007/cursor-usage#readme",
+  "bugs": {
+    "url": "https://github.com/iair0007/cursor-usage/issues"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -19,10 +23,23 @@
   ],
   "keywords": [
     "cursor",
+    "cursor ide",
     "usage",
     "tokens",
+    "token usage",
     "cost",
-    "dashboard"
+    "cost tracker",
+    "spend",
+    "spending",
+    "billing",
+    "budget",
+    "quota",
+    "requests",
+    "analytics",
+    "dashboard",
+    "pricing",
+    "cache savings",
+    "status bar"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
