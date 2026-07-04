@@ -147,6 +147,28 @@ export function sumTokenCostDollars(events: RawUsageEvent[]): number {
 
 const FREE_KIND_RE = /included|free|not charged|no charge|errored/i;
 
+const NOT_COUNTED_KIND_RE = /errored|aborted|cancel/i;
+
+/**
+ * Requests as cursor.com's own usage page counts them. The events API also
+ * returns errored/aborted generations and bookkeeping rows with no tokens
+ * and no charge, which the official request figures skip — counting raw
+ * rows overstates requests (e.g. 210 events vs 138 official requests).
+ * Mirrors logic.js isCountedRequest so the status bar and dashboard agree.
+ */
+export function countRequests(events: RawUsageEvent[]): number {
+  let n = 0;
+  for (const e of events) {
+    if (e.kind && NOT_COUNTED_KIND_RE.test(e.kind)) continue;
+    const tu = e.tokenUsage;
+    const totalTokens =
+      (tu?.inputTokens ?? 0) + (tu?.outputTokens ?? 0) + (tu?.cacheReadTokens ?? 0) + (tu?.cacheWriteTokens ?? 0);
+    if (!(totalTokens > 0) && !((e.chargedCents ?? 0) > 0)) continue;
+    n++;
+  }
+  return n;
+}
+
 /**
  * Actually-billed cost sum; ports the webview logic.js normalize() billedCost
  * rule so the status bar can show it without depending on the webview: free
@@ -163,6 +185,32 @@ export function sumBilledCostDollars(events: RawUsageEvent[], plan?: PlanInfo): 
     if (e.chargedCents != null) cents += e.chargedCents;
   }
   return cents / 100;
+}
+
+/**
+ * The status bar's main figure. Plans with a fixed included-request quota
+ * (e.g. 500 requests/month) show requests — "110/500" — because that's the
+ * number those users actually track, not the API-equivalent token cost. Once
+ * the quota is exhausted the bar pins at "500/500" and appends the on-demand
+ * (actually billed) usage accrued on top. Token-metered plans, where no
+ * request quota exists, keep showing cost.
+ */
+export function statusBarText(opts: {
+  quota?: PlanQuota | null;
+  costDollars: number;
+  onDemandDollars: number;
+  showWhatIfPrefix: boolean;
+}): string {
+  const { quota, costDollars, onDemandDollars, showWhatIfPrefix } = opts;
+  if (quota?.limit != null && quota.limit > 0) {
+    const limit = quota.limit;
+    const shownUsed = Math.min(quota.used, limit);
+    const base = `${shownUsed.toLocaleString('en-US')}/${limit.toLocaleString('en-US')}`;
+    return quota.used >= limit && onDemandDollars > 0
+      ? `${base} · $${onDemandDollars.toFixed(2)}`
+      : base;
+  }
+  return `${showWhatIfPrefix ? '~' : ''}$${costDollars.toFixed(2)}`;
 }
 
 /**
