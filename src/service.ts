@@ -166,6 +166,32 @@ export function sumBilledCostDollars(events: RawUsageEvent[], plan?: PlanInfo): 
 }
 
 /**
+ * The status bar's main figure. Plans with a fixed included-request quota
+ * (e.g. 500 requests/month) show requests — "110/500" — because that's the
+ * number those users actually track, not the API-equivalent token cost. Once
+ * the quota is exhausted the bar pins at "500/500" and appends the on-demand
+ * (actually billed) usage accrued on top. Token-metered plans, where no
+ * request quota exists, keep showing cost.
+ */
+export function statusBarText(opts: {
+  quota?: PlanQuota | null;
+  costDollars: number;
+  onDemandDollars: number;
+  showWhatIfPrefix: boolean;
+}): string {
+  const { quota, costDollars, onDemandDollars, showWhatIfPrefix } = opts;
+  if (quota?.limit != null && quota.limit > 0) {
+    const limit = quota.limit;
+    const shownUsed = Math.min(quota.used, limit);
+    const base = `${shownUsed.toLocaleString('en-US')}/${limit.toLocaleString('en-US')}`;
+    return quota.used >= limit && onDemandDollars > 0
+      ? `${base} · $${onDemandDollars.toFixed(2)}`
+      : base;
+  }
+  return `${showWhatIfPrefix ? '~' : ''}$${costDollars.toFixed(2)}`;
+}
+
+/**
  * % of a plan quota used, or null when there's no real limit to divide by.
  * `limit` can come back as 0 (not just null/undefined) for some plans —
  * treat both as "unlimited" so callers never do 0-limit division or format

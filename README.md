@@ -1,50 +1,61 @@
-# Cursor Usage Dashboard (extension)
+# Cursor Usage Dashboard
 
-Analyze how you spend Cursor tokens — costs, cache savings, model breakdowns, rule-based insights, and a cost simulator — in a dashboard that runs **inside Cursor**.
+**See exactly where your Cursor requests and tokens go — right inside Cursor.**
 
-This is the extension version of the standalone Cursor Usage Dashboard web app. Because it runs inside Cursor, there's no local proxy server and no login step: it reuses the session Cursor itself created when you signed in.
+[![Open VSX](https://img.shields.io/open-vsx/v/iair0007/cursor-usage-dashboard?label=Open%20VSX)](https://open-vsx.org/extension/iair0007/cursor-usage-dashboard)
+[![Downloads](https://img.shields.io/open-vsx/dt/iair0007/cursor-usage-dashboard)](https://open-vsx.org/extension/iair0007/cursor-usage-dashboard)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/iair0007/cursor-usage/blob/main/LICENSE)
 
-## Structure
+Costs, cache savings, model breakdowns, rule-based insights, and a cost simulator — with zero setup. No proxy server, no login: it reuses the session Cursor created when you signed in.
 
-The dashboard has four tabs, ordered from simple to detailed:
-
-- **Overview** (default tab) — the simple main screen: your plan and billing-cycle status, three key numbers (cost, requests, cache savings), a small daily-spend sparkline, and the single most important insight, if any. A "What-if / Billed" and period toggle control the whole dashboard from here. One button ("View full request log & charts →") jumps to the details.
-- **Requests** — the detailed view: full filter bar (custom date range, model filter), KPI strip, sortable/paginated request log with per-request cache savings and expensive-request highlighting, and an Analytics sub-tab (daily token cost, cost by model, token volume, with a week-over-week trend badge).
-- **Analyze** — rule-based findings (model concentration, cache health, cold starts, heavy-output requests, spike requests) with **configurable thresholds**, spend-by-model and cache panels, top expensive requests, and an **"Ask Cursor Chat" brief builder**: pick a template + data scopes, then "Copy for Cursor Chat" copies a compact brief and (best-effort) brings Cursor's chat panel into focus, so you just paste and send. There's no supported API for extensions to populate or submit a prompt into Cursor's chat directly — pasting is always the last, explicit step, by design.
-- **Simulator** — replay any real request's token profile against other models' published rates ("what would this request have cost on X?"), or price a custom token profile.
-
-## Features
-
-- **Plan-aware** — detects your plan (Free/Pro/Business/…) and shows a **What-if / Billed** cost toggle: What-if is the API-equivalent value of your tokens (useful for optimizing even on a plan where nothing is actually charged); Billed is what you were actually charged. A prominent **Plan & cycle** panel on the Overview tab shows a progress bar (used/limit + reset date + burn-rate projection) when Cursor reports a fixed request quota for your plan — and says so plainly when it doesn't (most Auto/token-metered usage isn't tracked by that legacy quota system, which is expected, not a bug).
-- **Status bar** — live token cost for the last 30 days (configurable), color-coded (warning/error background) as you approach your plan's included-request limit, with a burn-rate projection ("~12 days until included requests run out") in the tooltip. Click to open the dashboard. Auto-refreshes, and also syncs immediately whenever you open/refresh the dashboard.
-- Billing-mode aware: handles token-based plans, usage-based plans ($0.04/request-style flat fees shown separately from token cost), and mixed ranges after a plan change.
-- CSV export, model filter, custom date ranges (Requests tab).
-- Resilient pricing: if cursor.com's pricing page can't be reached or its layout changes, the dashboard falls back to a small bundled rate table (clearly flagged) instead of breaking cost estimates.
-
-## How authentication works
-
-Priority order (same as the original web app's proxy):
-
-1. **Cursor IDE session (default, zero setup)** — Cursor stores your session token locally in its `state.vscdb` database when you sign in. The extension reads it read-only, preferring the native `sqlite3` CLI (streams from disk, so it works even on multi-GB `state.vscdb` files) and falling back to a bundled WebAssembly SQLite for small DBs when the CLI isn't on PATH. It then calls the same cursor.com dashboard APIs the official usage page uses.
-2. **Team Admin API key** — run *"Cursor Usage: Set Team Admin API Key"* (requires a Teams/Business plan) to see team-wide usage via the official Admin API.
-3. **Manual session token** — if the local DB can't be read, run *"Cursor Usage: Set Session Token Manually"* and paste the `WorkosCursorSessionToken` cookie value from cursor.com (DevTools → Application → Cookies).
-
-> `sqlite3` ships preinstalled on macOS and virtually every Linux distro; on Windows 10/11 it's usually available too (`winget install SQLite.SQLite` otherwise). If the extension logs `Skipping WASM SQLite fallback ... too large for sql.js`, install the CLI and reload the window — the WASM path can't hold multi-GB DBs in memory.
-
-Secrets are stored in VS Code SecretStorage (OS keychain), never in settings files. *"Cursor Usage: Clear Stored Credentials"* removes them.
+![Overview tab](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-overview.png)
 
 ## Install
 
-**From the marketplace (recommended):** open the Extensions view in Cursor (`Ctrl+Shift+X` / `Cmd+Shift+X`), search for **"Cursor Usage Dashboard"**, and click Install. Then run **Cursor Usage: Open Dashboard** from the command palette.
+1. Open the Extensions view in Cursor (`Ctrl+Shift+X` / `Cmd+Shift+X`).
+2. Search for **"Cursor Usage Dashboard"** and click **Install**.
+3. Run **`Cursor Usage: Open Dashboard`** from the command palette — that's it.
 
-**From a `.vsix` file (manual/offline install):**
+The extension is published on the [Open VSX Registry](https://open-vsx.org/extension/iair0007/cursor-usage-dashboard), which is what Cursor's Extensions view searches.
 
-```bash
-npm install
-npm run package        # produces cursor-usage-dashboard-x.y.z.vsix
-```
+## Always-on status bar
 
-In Cursor: open the command palette → **Extensions: Install from VSIX…** → pick the `.vsix`. Then run **Cursor Usage: Open Dashboard**.
+A live usage figure sits in your status bar and updates automatically. Click it to open the dashboard.
+
+![Status bar states](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-statusbar.png)
+
+- **On plans with included requests** (e.g. 500/month) it shows **requests used vs. your limit** — `110/500` — because that's the number you actually watch on those plans.
+- It turns **yellow at 80%** and **red at 95%** of your quota (both thresholds configurable), and the tooltip projects when you'll run out at your current pace.
+- **Once the quota is exhausted** it pins at `500/500` and appends your **on-demand spend** — so you see immediately that you're now paying per use, and how much.
+- **On token-metered plans** (no request quota) it shows your token cost for the last 30 days (configurable).
+
+## What's inside
+
+The dashboard has four tabs, from simple to detailed:
+
+### Overview
+
+Your plan and billing-cycle status with a progress bar and burn-rate projection, three key numbers (cost, requests, cache savings), a daily-spend sparkline, and the single most important insight right now. A **What-if / Billed** toggle switches every figure between the API-equivalent value of your tokens and what you were actually charged.
+
+### Requests
+
+![Requests tab](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-requests.png)
+
+The full request log: custom date ranges, model filter, per-request token cost and cache savings, expensive-request highlighting, sortable columns, CSV export. The **Analytics** sub-tab adds daily token cost, cost by model, and token volume charts with a week-over-week trend badge.
+
+![Analytics charts](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-analytics.png)
+
+### Analyze
+
+![Analyze tab](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-analyze.png)
+
+Rule-based findings with configurable thresholds: which model dominates your spend, whether your cache is working, cold starts, heavy-output requests, spike requests — each with a concrete "what to do about it". The **Ask Cursor Chat** panel builds a compact brief from the data slices you pick, copies it, and focuses Cursor's chat so you just paste and send.
+
+### Simulator
+
+![Simulator tab](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-simulator.png)
+
+Replay any real request's token profile against other models' published rates — *"what would this request have cost on Haiku?"* — or price a custom token profile from scratch.
 
 ## Commands
 
@@ -55,42 +66,57 @@ In Cursor: open the command palette → **Extensions: Install from VSIX…** →
 | `Cursor Usage: Set Session Token Manually` | Fallback auth via pasted cookie |
 | `Cursor Usage: Set Team Admin API Key` | Team usage via the Admin API |
 | `Cursor Usage: Clear Stored Credentials` | Delete stored secrets |
+| `Cursor Usage: Show Logs` | Open the extension's output channel |
 
 ## Settings
 
 | Setting | Default | Description |
 | --- | --- | --- |
-| `cursorUsage.statusBar.enabled` | `true` | Show token cost in the status bar |
+| `cursorUsage.statusBar.enabled` | `true` | Show usage in the status bar |
+| `cursorUsage.statusBar.costMode` | `value` | What-if token value vs. actually billed cost |
 | `cursorUsage.refreshIntervalMinutes` | `15` | Status bar refresh cadence |
 | `cursorUsage.statusBar.periodDays` | `30` | Days covered by the status bar figure |
-| `cursorUsage.statusBar.warnAtPercent` | `80` | % of plan quota used before the status bar turns warning-colored |
-| `cursorUsage.statusBar.criticalAtPercent` | `95` | % of plan quota used before the status bar turns error-colored |
+| `cursorUsage.statusBar.warnAtPercent` | `80` | Quota % at which the status bar turns yellow |
+| `cursorUsage.statusBar.criticalAtPercent` | `95` | Quota % at which the status bar turns red |
 
-## Development
+## Authentication & privacy
+
+Everything runs locally — the only network calls are to cursor.com. Auth is resolved in this order:
+
+1. **Cursor IDE session (default, zero setup)** — Cursor stores your session token in its local `state.vscdb` database when you sign in. The extension reads it *read-only*, preferring the native `sqlite3` CLI (streams from disk, so it works even on multi-GB databases) with a bundled WebAssembly SQLite fallback for small files.
+2. **Team Admin API key** — run *"Cursor Usage: Set Team Admin API Key"* (Teams/Business plans) for team-wide usage via the official Admin API.
+3. **Manual session token** — run *"Cursor Usage: Set Session Token Manually"* and paste the `WorkosCursorSessionToken` cookie from cursor.com (DevTools → Application → Cookies).
+
+Secrets are stored in VS Code SecretStorage (your OS keychain), never in settings files. *"Cursor Usage: Clear Stored Credentials"* removes them.
+
+## Troubleshooting
+
+- **"Not signed in" but you are** — make sure you're logged into Cursor itself (Settings → Account). As a last resort, set a session token manually (see above).
+- **Huge `state.vscdb`** — the extension reads it with the `sqlite3` CLI, which handles multi-GB files. `sqlite3` ships preinstalled on macOS and virtually every Linux distro; on Windows it's usually present too (`winget install SQLite.SQLite` otherwise). If the logs show `Skipping WASM SQLite fallback ... too large for sql.js`, install the CLI and reload the window.
+- **Something looks off** — run `Cursor Usage: Show Logs` and check the output channel.
+
+## Good to know
+
+- The personal-usage endpoints (`cursor.com/api/dashboard/*`) are **unofficial** — Cursor can change them at any time. Each data source degrades gracefully; the Admin API path uses the documented official API.
+- Cache savings are **estimates**: cache-read tokens × (input rate − cache-read rate) at published per-model pricing. Simulator numbers are directional (same tokens, different rates), not quotes.
+- If cursor.com's pricing page can't be reached, the dashboard falls back to a small bundled rate table (clearly flagged) instead of breaking cost estimates.
+
+## Contributing
+
+Issues and PRs are welcome at [iair0007/cursor-usage](https://github.com/iair0007/cursor-usage).
 
 ```bash
 npm install
-npm run compile   # type-check + bundle (dist/ + media/)
-npm test          # unit tests for pricing/normalization/auth logic
+npm run compile   # type-check + bundle
+npm test          # unit tests
 npm run watch     # rebuild on change
+npm run package   # build a local .vsix (Extensions: Install from VSIX…)
 ```
 
-Layout: `src/extension.ts` (activation), `src/auth.ts` + `src/authCore.ts` (session resolution), `src/api.ts` (cursor.com client), `src/service.ts` (shared data layer), `src/panel.ts` + `src/html.ts` (webview + RPC bridge), `src/statusBar.ts`, `src/webview/` (dashboard UI: `main.js`, `logic.js`, `styles.css`).
+Layout: `src/extension.ts` (activation), `src/auth.ts` + `src/authCore.ts` (session resolution), `src/api.ts` (cursor.com client), `src/service.ts` (shared data layer), `src/panel.ts` + `src/html.ts` (webview + RPC bridge), `src/statusBar.ts`, `src/webview/` (dashboard UI).
 
-## Publishing (maintainers)
+Releases are automated: bumping `version` in `package.json` on `main` triggers the [publish workflow](https://github.com/iair0007/cursor-usage/blob/main/.github/workflows/publish.yml), which builds the `.vsix` and publishes it to Open VSX.
 
-Cursor's built-in Extensions view searches the [Open VSX Registry](https://open-vsx.org), not the Microsoft Marketplace, so that's the one to publish to:
+## License
 
-```bash
-npx ovsx create-namespace iair0007 -p <open-vsx-token>   # once, if the namespace isn't claimed yet
-npm run package                                       # builds the .vsix
-npx ovsx publish cursor-usage-dashboard-x.y.z.vsix -p <open-vsx-token>
-```
-
-Get a token from an Open VSX account (sign in with GitHub) under *Settings → Access Tokens*. Bump `version` in `package.json` before each publish.
-
-## Caveats
-
-- The personal-usage endpoints (`cursor.com/api/dashboard/*`) are **unofficial** — Cursor can change them at any time. Each data source degrades gracefully, and the Admin API path uses the documented official API.
-- Cache savings are **estimates**: cache-read tokens × (input rate − cache-read rate) using published pricing per model. Simulator numbers are directional (same tokens, different rates), not quotes.
-- All data stays on your machine; the only network calls are to cursor.com.
+[MIT](https://github.com/iair0007/cursor-usage/blob/main/LICENSE)

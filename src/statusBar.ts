@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { UsageService, projectExhaustionDate, quotaPercentUsed, sumBilledCostDollars, sumTokenCostDollars } from './service';
+import { UsageService, projectExhaustionDate, quotaPercentUsed, statusBarText, sumBilledCostDollars, sumTokenCostDollars } from './service';
 
 type CostMode = 'value' | 'billed';
 
@@ -75,9 +75,8 @@ export class UsageStatusBar {
       }
 
       const freePlan = result.plan?.membershipType?.startsWith('free') ?? false;
-      const cost = costMode === 'billed'
-        ? sumBilledCostDollars(result.events, result.plan)
-        : sumTokenCostDollars(result.events);
+      const billed = sumBilledCostDollars(result.events, result.plan);
+      const cost = costMode === 'billed' ? billed : sumTokenCostDollars(result.events);
       const showWhatIfPrefix = costMode === 'value' && freePlan;
 
       const quota = result.quota;
@@ -96,7 +95,7 @@ export class UsageStatusBar {
             : undefined;
 
       const icon = severity === 'critical' ? '$(warning)' : severity === 'warning' ? '$(alert)' : '$(graph)';
-      this.item.text = `${icon} ${showWhatIfPrefix ? '~' : ''}$${cost.toFixed(2)}`;
+      this.item.text = `${icon} ${statusBarText({ quota, costDollars: cost, onDemandDollars: billed, showWhatIfPrefix })}`;
 
       const tooltip = new vscode.MarkdownString(undefined, true);
       tooltip.appendMarkdown(`**Cursor Usage** — last ${periodDays} days\n\n`);
@@ -113,6 +112,9 @@ export class UsageStatusBar {
             ? `- Plan usage: **${quota.used.toLocaleString('en-US')} / ${quota.limit!.toLocaleString('en-US')} · limit reached** (${quotaPct!.toFixed(0)}%)\n`
             : `- Plan usage: **${quota.used.toLocaleString('en-US')} / ${quota.limit!.toLocaleString('en-US')}** (${quotaPct!.toFixed(0)}%)\n`,
         );
+        if (quota.used >= quota.limit!) {
+          tooltip.appendMarkdown(`- On-demand usage (last ${periodDays} days): **$${billed.toFixed(2)}**\n`);
+        }
         if (quota.resetIso) {
           const resetDate = new Date(quota.resetIso);
           if (!Number.isNaN(resetDate.getTime())) {

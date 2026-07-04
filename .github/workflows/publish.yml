@@ -1,0 +1,56 @@
+# Publishes the extension to the Open VSX Registry (what Cursor's Extensions
+# view searches) whenever the version in package.json is ahead of the version
+# already published. To release: bump "version" in package.json and push to
+# main — nothing else to do.
+#
+# Requires the OVSX_PAT repository secret: an Open VSX access token from
+# https://open-vsx.org/user-settings/tokens (Settings → Access Tokens).
+name: Publish to Open VSX
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Compare local vs published version
+        id: version
+        run: |
+          local=$(node -p "require('./package.json').version")
+          published=$(curl -fsSL https://open-vsx.org/api/iair0007/cursor-usage-dashboard | jq -r '.version' || echo "none")
+          echo "local=$local" >> "$GITHUB_OUTPUT"
+          echo "published=$published" >> "$GITHUB_OUTPUT"
+          echo "Local: $local — published on Open VSX: $published"
+
+      - name: Build .vsix
+        if: steps.version.outputs.local != steps.version.outputs.published
+        run: npm run package
+
+      - name: Publish to Open VSX
+        if: steps.version.outputs.local != steps.version.outputs.published
+        run: npx --yes ovsx publish "cursor-usage-dashboard-${{ steps.version.outputs.local }}.vsix" -p "$OVSX_PAT"
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
+      - name: Already published — nothing to do
+        if: steps.version.outputs.local == steps.version.outputs.published
+        run: echo "Version ${{ steps.version.outputs.local }} is already on Open VSX; skipping publish."

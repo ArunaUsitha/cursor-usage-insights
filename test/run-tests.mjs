@@ -291,6 +291,36 @@ test('malformed startOfMonth is dropped instead of producing an invalid resetIso
   assert.equal(quota.resetIso, undefined);
 });
 
+console.log('service.statusBarText');
+test('request-quota plans show used/limit, not cost', () => {
+  assert.equal(
+    service.statusBarText({ quota: { used: 110, limit: 500 }, costDollars: 42.5, onDemandDollars: 0, showWhatIfPrefix: false }),
+    '110/500',
+  );
+});
+test('quota exhausted pins at limit/limit and appends on-demand spend', () => {
+  assert.equal(
+    service.statusBarText({ quota: { used: 512, limit: 500 }, costDollars: 42.5, onDemandDollars: 12.34, showWhatIfPrefix: false }),
+    '500/500 · $12.34',
+  );
+});
+test('quota exactly at limit with no on-demand spend yet shows just limit/limit', () => {
+  assert.equal(
+    service.statusBarText({ quota: { used: 500, limit: 500 }, costDollars: 42.5, onDemandDollars: 0, showWhatIfPrefix: false }),
+    '500/500',
+  );
+});
+test('no quota limit falls back to cost (with what-if prefix on free plans)', () => {
+  assert.equal(
+    service.statusBarText({ quota: { used: 5, limit: 0 }, costDollars: 42.5, onDemandDollars: 0, showWhatIfPrefix: false }),
+    '$42.50',
+  );
+  assert.equal(
+    service.statusBarText({ quota: null, costDollars: 3.1, onDemandDollars: 0, showWhatIfPrefix: true }),
+    '~$3.10',
+  );
+});
+
 console.log('service.quotaPercentUsed');
 test('limit of 0 is treated as unlimited, not a percentage of 0', () => {
   // Regression: this used to crash the status bar with "Cannot read
