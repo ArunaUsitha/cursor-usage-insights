@@ -9,23 +9,9 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { build } from 'esbuild';
 
-import {
-  parsePricing,
-  matchPricing,
-  estimateTokenCost,
-  cacheSavingsFor,
-  displayModel,
-  normalize,
-  summarize,
-  detectBillingMode,
-  isCountedRequest,
-  percentile,
-  projectExhaustionDate,
-} from '../src/webview/logic.js';
-
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-// Bundle the TS modules under test into importable ESM.
+// Bundle modules under test into importable ESM (resolves .ts deps logic.js pulls in).
 async function loadTs(entry, outName) {
   const outfile = path.join(here, '.build', outName);
   await build({
@@ -38,6 +24,20 @@ async function loadTs(entry, outName) {
   });
   return import(outfile);
 }
+
+const {
+  parsePricing,
+  matchPricing,
+  estimateTokenCost,
+  cacheSavingsFor,
+  displayModel,
+  normalize,
+  summarize,
+  detectBillingMode,
+  isCountedRequest,
+  percentile,
+  projectExhaustionDate,
+} = await loadTs('src/webview/logic.js', 'logic.mjs');
 
 let passed = 0;
 let failed = 0;
