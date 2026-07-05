@@ -328,23 +328,64 @@ test('service.countRequests applies the same rules to raw events', () => {
   assert.equal(service.countRequests(events), 2);
 });
 
+console.log('service.quotaFillBar');
+test('fills segments proportionally and caps at full', () => {
+  assert.equal(service.quotaFillBar(0, 500), '○○○○○');
+  assert.equal(service.quotaFillBar(110, 500), '●○○○○');
+  assert.equal(service.quotaFillBar(250, 500), '●●○○○');
+  assert.equal(service.quotaFillBar(500, 500), '●●●●●');
+  assert.equal(service.quotaFillBar(512, 500), '●●●●●');
+});
+test('supports alternate fill styles', () => {
+  assert.equal(service.quotaFillBar(110, 500, 5, 'blocks'), '█░░░░');
+  assert.equal(service.quotaFillBar(500, 500, 5, 'stars'), '★★★★★');
+  assert.equal(service.quotaFillBar(110, 500, 5, 'none'), '');
+});
+
 console.log('service.statusBarText');
-test('request-quota plans show used/limit, not cost', () => {
+test('request-quota plans show used/limit and reset date by default', () => {
   assert.equal(
-    service.statusBarText({ quota: { used: 110, limit: 500 }, costDollars: 42.5, onDemandDollars: 0, showWhatIfPrefix: false }),
-    '110/500',
+    service.statusBarText({
+      quota: { used: 110, limit: 500, resetIso: '2026-08-01T00:00:00.000Z' },
+      costDollars: 42.5,
+      onDemandDollars: 0,
+      showWhatIfPrefix: false,
+    }),
+    '110/500 ●○○○○ · Aug 1',
   );
 });
-test('quota exhausted pins at limit/limit and appends on-demand spend', () => {
+test('quota format remaining shows requests left', () => {
   assert.equal(
-    service.statusBarText({ quota: { used: 512, limit: 500 }, costDollars: 42.5, onDemandDollars: 12.34, showWhatIfPrefix: false }),
-    '500/500 · $12.34',
+    service.statusBarText({
+      quota: { used: 110, limit: 500, resetIso: '2026-08-01T00:00:00.000Z' },
+      costDollars: 42.5,
+      onDemandDollars: 0,
+      showWhatIfPrefix: false,
+      quotaFormat: 'remaining',
+    }),
+    '390 left ●○○○○ · Aug 1',
   );
 });
-test('quota exactly at limit with no on-demand spend yet shows just limit/limit', () => {
+test('quota exhausted pins at limit/limit, appends on-demand spend and reset', () => {
   assert.equal(
-    service.statusBarText({ quota: { used: 500, limit: 500 }, costDollars: 42.5, onDemandDollars: 0, showWhatIfPrefix: false }),
-    '500/500',
+    service.statusBarText({
+      quota: { used: 512, limit: 500, resetIso: '2026-08-01T00:00:00.000Z' },
+      costDollars: 42.5,
+      onDemandDollars: 12.34,
+      showWhatIfPrefix: false,
+    }),
+    '500/500 ●●●●● · $12.34 · Aug 1',
+  );
+});
+test('quota exactly at limit with no on-demand spend yet shows limit/limit and reset', () => {
+  assert.equal(
+    service.statusBarText({
+      quota: { used: 500, limit: 500, resetIso: '2026-08-01T00:00:00.000Z' },
+      costDollars: 42.5,
+      onDemandDollars: 0,
+      showWhatIfPrefix: false,
+    }),
+    '500/500 ●●●●● · Aug 1',
   );
 });
 test('no quota limit falls back to cost (with what-if prefix on free plans)', () => {
@@ -356,6 +397,76 @@ test('no quota limit falls back to cost (with what-if prefix on free plans)', ()
     service.statusBarText({ quota: null, costDollars: 3.1, onDemandDollars: 0, showWhatIfPrefix: true }),
     '~$3.10',
   );
+});
+
+console.log('billingCycleWindow');
+test('uses quota cycle start when known', () => {
+  const now = new Date('2026-07-05T15:30:00.000Z');
+  const { start, end } = service.billingCycleWindow(
+    { startOfCycleIso: '2026-06-15T08:00:00.000Z' },
+    now,
+  );
+  const startDate = new Date(start);
+  assert.equal(startDate.getFullYear(), 2026);
+  assert.equal(startDate.getMonth(), 5); // June
+  assert.equal(startDate.getDate(), 15);
+  const endDate = new Date(end);
+  assert.equal(endDate.getFullYear(), now.getFullYear());
+  assert.equal(endDate.getMonth(), now.getMonth());
+  assert.equal(endDate.getDate(), now.getDate());
+  assert.equal(endDate.getHours(), 23);
+  assert.equal(endDate.getMinutes(), 59);
+});
+test('falls back to calendar month when cycle start is unknown', () => {
+  const now = new Date('2026-07-05T15:30:00.000Z');
+  const { start } = service.billingCycleWindow(null, now);
+  const startDate = new Date(start);
+  assert.equal(startDate.getFullYear(), now.getFullYear());
+  assert.equal(startDate.getMonth(), now.getMonth());
+  assert.equal(startDate.getDate(), 1);
+});
+test('formatCycleRangeLabel renders a short range', () => {
+  const start = new Date(2026, 5, 15); // local Jun 15
+  const end = new Date(2026, 6, 5, 23, 59, 59, 999); // local Jul 5
+  const label = service.formatCycleRangeLabel(start.getTime(), end.getTime());
+  assert.match(label, /Jun 15/);
+  assert.match(label, /Jul 5/);
+});
+test('rollingDayWindow spans N calendar days through today', () => {
+  const now = new Date(2026, 6, 5, 15, 30, 0); // local Jul 5
+  const { start, end } = service.rollingDayWindow(30, now);
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  assert.equal(startDate.getDate(), 6); // Jun 6
+  assert.equal(startDate.getMonth(), 5);
+  assert.equal(endDate.getDate(), 5);
+  assert.equal(endDate.getMonth(), 6);
+});
+test('statusBarWindow picks cycle or rolling days', () => {
+  const now = new Date(2026, 6, 5, 15, 30, 0);
+  const cycle = service.statusBarWindow('cycle', 30, { startOfCycleIso: '2026-06-15T00:00:00.000Z' }, now);
+  assert.equal(new Date(cycle.start).getDate(), 15);
+  const days = service.statusBarWindow('days', 7, null, now);
+  assert.equal(new Date(days.start).getDate(), 29); // Jun 29
+});
+
+console.log('service.parseStatusBarPeriodConfig');
+test('cycle mode ignores periodDays', () => {
+  assert.deepEqual(service.parseStatusBarPeriodConfig('cycle', 7), { mode: 'cycle', periodDays: 30 });
+});
+test('days:N embeds the rolling window length', () => {
+  assert.deepEqual(service.parseStatusBarPeriodConfig('days:14', 30), { mode: 'days', periodDays: 14 });
+  assert.deepEqual(service.parseStatusBarPeriodConfig('days:90', 7), { mode: 'days', periodDays: 90 });
+});
+test('legacy days mode still reads periodDays', () => {
+  assert.deepEqual(service.parseStatusBarPeriodConfig('days', 45), { mode: 'days', periodDays: 45 });
+});
+test('unknown period mode falls back to cycle', () => {
+  assert.deepEqual(service.parseStatusBarPeriodConfig('week', 7), { mode: 'cycle', periodDays: 30 });
+});
+test('period days are clamped to 1–90', () => {
+  assert.deepEqual(service.parseStatusBarPeriodConfig('days', 0), { mode: 'days', periodDays: 1 });
+  assert.deepEqual(service.parseStatusBarPeriodConfig('days:120', 30), { mode: 'days', periodDays: 90 });
 });
 
 console.log('service.quotaPercentUsed');
@@ -378,10 +489,10 @@ test('usage over the limit is not clamped to 100 — callers need the true % to 
   assert.equal(service.quotaPercentUsed({ used: 512, limit: 500 }), 102.4);
 });
 
-console.log('projectExhaustionDate (service.ts and logic.js copies agree)');
+console.log('projectExhaustionDate (shared usageLogic via logic.js)');
 const DAY = 24 * 60 * 60 * 1000;
-for (const [name, fn] of [['service.ts', service.projectExhaustionDate], ['logic.js', projectExhaustionDate]]) {
-  test(`${name}: projects a future date at a steady burn rate`, () => {
+for (const fn of [projectExhaustionDate]) {
+  test('projects a future date at a steady burn rate', () => {
     const now = Date.now();
     const since = now - 10 * DAY;
     // 100 used in 10 days = 10/day; 400 left / 10 per day = 40 days out.
@@ -390,12 +501,12 @@ for (const [name, fn] of [['service.ts', service.projectExhaustionDate], ['logic
     const daysOut = Math.round((result.getTime() - now) / DAY);
     assert.equal(daysOut, 40);
   });
-  test(`${name}: already exhausted returns "now"`, () => {
+  test('already exhausted returns "now"', () => {
     const now = Date.now();
     const result = fn(600, 500, now - 10 * DAY, now);
     assert.equal(result.getTime(), now);
   });
-  test(`${name}: no limit, no usage yet, or too little elapsed time returns null`, () => {
+  test('no limit, no usage yet, or too little elapsed time returns null', () => {
     const now = Date.now();
     assert.equal(fn(100, null, now - 10 * DAY, now), null);
     assert.equal(fn(0, 500, now - 10 * DAY, now), null);

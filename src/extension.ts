@@ -25,7 +25,12 @@ export function activate(context: vscode.ExtensionContext): void {
       output.show(true);
     }),
 
+    vscode.commands.registerCommand('cursorUsage.openSettings', () => {
+      void vscode.commands.executeCommand('workbench.action.openSettings', 'cursorUsage');
+    }),
+
     vscode.commands.registerCommand('cursorUsage.refresh', () => {
+      service.invalidateCaches();
       DashboardPanel.refresh();
       void statusBar.refresh();
     }),
@@ -40,6 +45,7 @@ export function activate(context: vscode.ExtensionContext): void {
       });
       if (!input) return;
       if (await storeManualSessionToken(context, input)) {
+        service.invalidateCaches();
         void vscode.window.showInformationMessage('Cursor Usage: session token saved.');
         DashboardPanel.refresh();
         void statusBar.refresh();
@@ -59,6 +65,7 @@ export function activate(context: vscode.ExtensionContext): void {
       });
       if (!input?.trim()) return;
       await storeAdminApiKey(context, input);
+      service.invalidateCaches();
       void vscode.window.showInformationMessage('Cursor Usage: Admin API key saved. Team usage will be used.');
       DashboardPanel.refresh();
       void statusBar.refresh();
@@ -66,6 +73,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.commands.registerCommand('cursorUsage.clearStoredCredentials', async () => {
       await clearStoredCredentials(context);
+      service.invalidateCaches();
       void vscode.window.showInformationMessage('Cursor Usage: stored credentials cleared.');
       DashboardPanel.refresh();
       void statusBar.refresh();
