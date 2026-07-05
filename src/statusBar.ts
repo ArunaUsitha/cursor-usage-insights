@@ -1,16 +1,25 @@
 import * as vscode from 'vscode';
-import { UsageService, countRequests, projectExhaustionDate, quotaPercentUsed, statusBarText, sumBilledCostDollars, sumTokenCostDollars } from './service';
+import {
+  UsageService,
+  countRequests,
+  formatCycleRangeLabel,
+  projectExhaustionDate,
+  quotaPercentUsed,
+  parseStatusBarPeriodConfig,
+  statusBarText,
+  statusBarWindow,
+  sumBilledCostDollars,
+  sumTokenCostDollars,
+  type StatusBarFillStyle,
+  type StatusBarPeriodMode,
+  type StatusBarQuotaFormat,
+} from './service';
 
 type CostMode = 'value' | 'billed';
 
-/** Calendar-day window matching the dashboard's date presets (not a raw ms rollback). */
-function dayWindow(periodDays: number): { start: number; end: number } {
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - (periodDays - 1));
-  return { start: start.getTime(), end: end.getTime() };
+function statusBarTooltipFooter(tooltip: vscode.MarkdownString): void {
+  tooltip.isTrusted = true;
+  tooltip.appendMarkdown(`\n_Click to open the dashboard · [Settings](command:cursorUsage.openSettings)_`);
 }
 
 export class UsageStatusBar {
@@ -22,7 +31,10 @@ export class UsageStatusBar {
     this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     this.item.command = 'cursorUsage.openDashboard';
     this.item.text = '$(graph) Cursor Usage';
-    this.item.tooltip = 'Cursor Usage: loading…';
+    const loadingTooltip = new vscode.MarkdownString(undefined, true);
+    loadingTooltip.appendMarkdown('Cursor Usage: loading…');
+    statusBarTooltipFooter(loadingTooltip);
+    this.item.tooltip = loadingTooltip;
 
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
@@ -35,13 +47,24 @@ export class UsageStatusBar {
   private config() {
     const cfg = vscode.workspace.getConfiguration('cursorUsage');
     const costMode = cfg.get<string>('statusBar.costMode', 'value');
+    const periodModeRaw = cfg.get<string>('statusBar.periodMode', 'cycle');
+    const { mode: periodMode, periodDays } = parseStatusBarPeriodConfig(
+      periodModeRaw,
+      cfg.get<number>('statusBar.periodDays', 30),
+    );
+    const quotaFormatRaw = cfg.get<string>('statusBar.quotaFormat', 'usedLimit');
+    const fillStyleRaw = cfg.get<string>('statusBar.fillStyle', 'dots');
+    const fillStyles = new Set(['dots', 'blocks', 'squares', 'stars', 'bars', 'none']);
     return {
       enabled: cfg.get<boolean>('statusBar.enabled', true),
       intervalMinutes: Math.max(5, cfg.get<number>('refreshIntervalMinutes', 15)),
-      periodDays: Math.min(90, Math.max(1, cfg.get<number>('statusBar.periodDays', 30))),
+      periodMode: periodMode as StatusBarPeriodMode,
+      periodDays,
       costMode: (costMode === 'billed' ? 'billed' : 'value') as CostMode,
       warnAtPercent: Math.min(99, Math.max(1, cfg.get<number>('statusBar.warnAtPercent', 80))),
       criticalAtPercent: Math.min(200, Math.max(1, cfg.get<number>('statusBar.criticalAtPercent', 95))),
+      quotaFormat: (quotaFormatRaw === 'remaining' ? 'remaining' : 'usedLimit') as StatusBarQuotaFormat,
+      fillStyle: (fillStyles.has(fillStyleRaw) ? fillStyleRaw : 'dots') as StatusBarFillStyle,
     };
   }
 
@@ -60,16 +83,21 @@ export class UsageStatusBar {
   }
 
   async refresh(): Promise<void> {
-    const { enabled, periodDays, costMode, warnAtPercent, criticalAtPercent } = this.config();
+    const { enabled, periodMode, periodDays, costMode, warnAtPercent, criticalAtPercent, quotaFormat, fillStyle } =
+      this.config();
     if (!enabled) return;
 
     try {
-      const { start, end } = dayWindow(periodDays);
-      const result = await this.service.getUsage(start, end);
+      const result = await this.service.getStatusBarUsage({ mode: periodMode, periodDays });
 
       if (result.authMode === 'none') {
         this.item.text = '$(graph) Cursor Usage';
-        this.item.tooltip = 'Cursor Usage: sign into Cursor (or set a session token) to load data. Click to open the dashboard.';
+        const authTooltip = new vscode.MarkdownString(undefined, true);
+        authTooltip.appendMarkdown(
+          'Cursor Usage: sign into Cursor (or set a session token) to load data.',
+        );
+        statusBarTooltipFooter(authTooltip);
+        this.item.tooltip = authTooltip;
         this.item.backgroundColor = undefined;
         return;
       }
@@ -80,6 +108,13 @@ export class UsageStatusBar {
       const showWhatIfPrefix = costMode === 'value' && freePlan;
 
       const quota = result.quota;
+      const { start: windowStart, end: windowEnd } = statusBarWindow(periodMode, periodDays, quota);
+      const periodLabel =
+        periodMode === 'days'
+          ? `last ${periodDays} days`
+          : `${formatCycleRangeLabel(windowStart, windowEnd)} (current cycle)`;
+      const periodScope = periodMode === 'days' ? `last ${periodDays} days` : 'this cycle';
+
       const quotaPct = quotaPercentUsed(quota);
       const hasQuotaLimit = quotaPct != null;
       let severity: 'normal' | 'warning' | 'critical' = 'normal';
@@ -95,15 +130,22 @@ export class UsageStatusBar {
             : undefined;
 
       const icon = severity === 'critical' ? '$(warning)' : severity === 'warning' ? '$(alert)' : '$(graph)';
-      this.item.text = `${icon} ${statusBarText({ quota, costDollars: cost, onDemandDollars: billed, showWhatIfPrefix })}`;
+      this.item.text = `${icon} ${statusBarText({
+        quota,
+        costDollars: cost,
+        onDemandDollars: billed,
+        showWhatIfPrefix,
+        quotaFormat,
+        fillStyle,
+      })}`;
 
       const tooltip = new vscode.MarkdownString(undefined, true);
-      tooltip.appendMarkdown(`**Cursor Usage** — last ${periodDays} days\n\n`);
+      tooltip.appendMarkdown(`**Cursor Usage** — ${periodLabel}\n\n`);
       const costLabel = costMode === 'billed'
         ? 'Billed cost'
         : `Token ${freePlan ? 'value (what-if, not billed)' : 'cost'}`;
-      tooltip.appendMarkdown(`- ${costLabel}: **$${cost.toFixed(2)}**\n`);
-      tooltip.appendMarkdown(`- Requests: **${countRequests(result.events).toLocaleString('en-US')}**\n`);
+      tooltip.appendMarkdown(`- ${costLabel} (${periodScope}): **$${cost.toFixed(2)}**\n`);
+      tooltip.appendMarkdown(`- Requests (${periodScope}): **${countRequests(result.events).toLocaleString('en-US')}**\n`);
       if (result.plan?.membershipType) tooltip.appendMarkdown(`- Plan: ${result.plan.membershipType}\n`);
       if (quota && hasQuotaLimit) {
         const overLimit = quota.used > quota.limit!;
@@ -113,7 +155,7 @@ export class UsageStatusBar {
             : `- Plan usage: **${quota.used.toLocaleString('en-US')} / ${quota.limit!.toLocaleString('en-US')}** (${quotaPct!.toFixed(0)}%)\n`,
         );
         if (quota.used >= quota.limit!) {
-          tooltip.appendMarkdown(`- On-demand usage (last ${periodDays} days): **$${billed.toFixed(2)}**\n`);
+          tooltip.appendMarkdown(`- On-demand usage (${periodScope}): **$${billed.toFixed(2)}**\n`);
         }
         if (quota.resetIso) {
           const resetDate = new Date(quota.resetIso);
@@ -146,11 +188,14 @@ export class UsageStatusBar {
         tooltip.appendMarkdown(`- Spend cap: **$${result.hardLimit.toFixed(2)}**/mo (see dashboard for cycle-to-date billed total)\n`);
       }
       if (result.email) tooltip.appendMarkdown(`- Account: ${result.email}\n`);
-      tooltip.appendMarkdown(`\n_Click to open the dashboard._`);
+      statusBarTooltipFooter(tooltip);
       this.item.tooltip = tooltip;
     } catch (e: any) {
       this.item.text = '$(graph) Cursor Usage';
-      this.item.tooltip = `Cursor Usage: ${e?.message || 'failed to load'} — click to open the dashboard.`;
+      const errorTooltip = new vscode.MarkdownString(undefined, true);
+      errorTooltip.appendMarkdown(`Cursor Usage: ${e?.message || 'failed to load'}.`);
+      statusBarTooltipFooter(errorTooltip);
+      this.item.tooltip = errorTooltip;
       this.item.backgroundColor = undefined;
     }
   }

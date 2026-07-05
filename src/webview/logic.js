@@ -3,6 +3,28 @@
 // Pure dashboard logic (pricing parsing, event normalization, aggregation).
 // No DOM or VS Code dependencies so it can be unit-tested in Node directly.
 
+import {
+  billedCostForEvent,
+  countRequests,
+  isCountedRequest,
+  projectExhaustionDate,
+  quotaPercentUsed,
+  statusBarText,
+  sumBilledCostDollars,
+  sumTokenCostDollars,
+} from '../shared/usageLogic.ts';
+
+export {
+  billedCostForEvent,
+  countRequests,
+  isCountedRequest,
+  projectExhaustionDate,
+  quotaPercentUsed,
+  statusBarText,
+  sumBilledCostDollars,
+  sumTokenCostDollars,
+};
+
 export const MODEL_ALIASES = {
   auto: ['auto', 'default', 'cursor-auto'],
   'claude-4-5-sonnet': ['claude-4.5-sonnet', 'claude-4-5-sonnet'],
@@ -203,15 +225,7 @@ export function normalize(raw, pricing, opts = {}) {
 
   // billedCost = what the user actually pays for this request on their plan,
   // as opposed to `cost` which is the API-equivalent value of the tokens.
-  const kindL = String(raw.kind || '').toLowerCase();
-  let billedCost = null;
-  if (opts.freePlan) {
-    billedCost = 0;
-  } else if (/included|free|not charged|no charge|errored/.test(kindL)) {
-    billedCost = 0;
-  } else if (chargedCents != null) {
-    billedCost = chargedCents / 100;
-  }
+  const billedCost = billedCostForEvent(raw.kind, chargedCents, opts.freePlan);
 
   let ts = num(raw.timestamp);
   if (ts > 0 && ts < 1e12) ts *= 1000;
@@ -244,22 +258,6 @@ export function normalize(raw, pricing, opts = {}) {
     cacheWriteTokens,
     totalTokens,
   };
-}
-
-const NOT_COUNTED_KIND_RE = /errored|aborted|cancel/i;
-
-/**
- * Whether cursor.com's own usage page would count this event as a request.
- * The dashboard events API returns every event row — including errored or
- * aborted generations and bookkeeping rows with no tokens and no charge —
- * while the official "requests" figures skip those, so counting raw rows
- * overstates requests. Mirrored in service.ts (countRequests) so the status
- * bar agrees without a round trip.
- */
-export function isCountedRequest(kind, totalTokens, chargedCents) {
-  if (kind && NOT_COUNTED_KIND_RE.test(String(kind))) return false;
-  if (!(totalTokens > 0) && !(chargedCents > 0)) return false;
-  return true;
 }
 
 export function detectBillingMode(events) {
@@ -303,19 +301,3 @@ export function percentile(arr, p) {
   return sorted[Math.floor(sorted.length * p)] || sorted[sorted.length - 1];
 }
 
-/**
- * Straight-line projection of when `used` will hit `limit`, from the average
- * daily pace since `sinceMs`. Mirrors service.ts's projectExhaustionDate
- * (duplicated here so the webview doesn't need a round trip to compute it).
- */
-export function projectExhaustionDate(used, limit, sinceMs, nowMs = Date.now()) {
-  if (limit == null || limit <= 0 || used <= 0) return null;
-  const elapsedDays = (nowMs - sinceMs) / (24 * 60 * 60 * 1000);
-  if (elapsedDays < 0.5) return null;
-  const perDay = used / elapsedDays;
-  if (perDay <= 0) return null;
-  const remaining = limit - used;
-  if (remaining <= 0) return new Date(nowMs);
-  const daysLeft = remaining / perDay;
-  return new Date(nowMs + daysLeft * 24 * 60 * 60 * 1000);
-}

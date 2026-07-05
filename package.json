@@ -2,7 +2,7 @@
   "name": "cursor-usage-dashboard",
   "displayName": "Cursor Usage Dashboard",
   "description": "Track your remaining Cursor requests and spend: status bar quota gauge, cost dashboard, cache savings, model breakdown, cost simulator.",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "publisher": "iair0007",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -70,62 +70,182 @@
       {
         "command": "cursorUsage.showLogs",
         "title": "Cursor Usage: Show Logs"
+      },
+      {
+        "command": "cursorUsage.openSettings",
+        "title": "Cursor Usage: Open Settings"
       }
     ],
-    "configuration": {
-      "title": "Cursor Usage Dashboard",
-      "properties": {
-        "cursorUsage.statusBar.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show current period token cost in the status bar."
-        },
-        "cursorUsage.statusBar.costMode": {
-          "type": "string",
-          "enum": [
-            "value",
-            "billed"
-          ],
-          "enumDescriptions": [
-            "API-equivalent value of your tokens, even on plans/requests where nothing is actually charged.",
-            "What you were actually billed (0 on free plans and for included/errored requests)."
-          ],
-          "default": "value",
-          "description": "Whether the status bar shows the what-if token value or the actually billed cost."
-        },
-        "cursorUsage.refreshIntervalMinutes": {
-          "type": "number",
-          "default": 15,
-          "minimum": 5,
-          "description": "How often the status bar refreshes usage data (minutes)."
-        },
-        "cursorUsage.statusBar.periodDays": {
-          "type": "number",
-          "default": 30,
-          "minimum": 1,
-          "maximum": 90,
-          "description": "How many days back the status bar cost figure covers."
-        },
-        "cursorUsage.statusBar.warnAtPercent": {
-          "type": "number",
-          "default": 80,
-          "minimum": 1,
-          "maximum": 99,
-          "description": "Highlight the status bar (warning color) once this % of your plan's included requests are used."
-        },
-        "cursorUsage.statusBar.criticalAtPercent": {
-          "type": "number",
-          "default": 95,
-          "minimum": 1,
-          "maximum": 200,
-          "description": "Highlight the status bar (error color) once this % of your plan's included requests are used."
+    "configuration": [
+      {
+        "title": "Status Bar",
+        "order": 1,
+        "properties": {
+          "cursorUsage.statusBar.enabled": {
+            "type": "boolean",
+            "default": true,
+            "order": 1,
+            "description": "Show Cursor usage in the editor status bar."
+          },
+          "cursorUsage.refreshIntervalMinutes": {
+            "type": "number",
+            "default": 15,
+            "minimum": 5,
+            "order": 2,
+            "description": "How often usage data is refreshed (minutes)."
+          }
+        }
+      },
+      {
+        "title": "Time Range & Cost",
+        "order": 2,
+        "properties": {
+          "cursorUsage.statusBar.periodMode": {
+            "type": "string",
+            "enum": [
+              "cycle",
+              "days:7",
+              "days:14",
+              "days:21",
+              "days:30",
+              "days:45",
+              "days:60",
+              "days:90"
+            ],
+            "enumItemLabels": [
+              "Current billing cycle",
+              "Last 7 days",
+              "Last 14 days",
+              "Last 21 days",
+              "Last 30 days",
+              "Last 45 days",
+              "Last 60 days",
+              "Last 90 days"
+            ],
+            "enumDescriptions": [
+              "Usage from your billing-cycle start through today (matches your plan quota).",
+              "Rolling window of the last 7 calendar days through today.",
+              "Rolling window of the last 14 calendar days through today.",
+              "Rolling window of the last 21 calendar days through today.",
+              "Rolling window of the last 30 calendar days through today.",
+              "Rolling window of the last 45 calendar days through today.",
+              "Rolling window of the last 60 calendar days through today.",
+              "Rolling window of the last 90 calendar days through today."
+            ],
+            "default": "cycle",
+            "order": 1,
+            "description": "Which time window the status bar totals cover."
+          },
+          "cursorUsage.statusBar.periodDays": {
+            "type": "number",
+            "default": 30,
+            "minimum": 1,
+            "maximum": 90,
+            "order": 2,
+            "markdownDeprecationMessage": "Use **Period Mode** and pick a “Last N days” option instead. This setting only applies when Period Mode is the legacy value `days`."
+          },
+          "cursorUsage.statusBar.costMode": {
+            "type": "string",
+            "enum": [
+              "value",
+              "billed"
+            ],
+            "enumItemLabels": [
+              "Token value (what-if)",
+              "Actually billed"
+            ],
+            "enumDescriptions": [
+              "API-equivalent value of your tokens, even on plans/requests where nothing is actually charged.",
+              "What you were actually billed (0 on free plans and for included/errored requests)."
+            ],
+            "default": "value",
+            "order": 3,
+            "description": "Whether the status bar shows token value or billed cost."
+          }
+        }
+      },
+      {
+        "title": "Quota Display",
+        "order": 3,
+        "properties": {
+          "cursorUsage.statusBar.quotaFormat": {
+            "type": "string",
+            "enum": [
+              "usedLimit",
+              "remaining"
+            ],
+            "enumItemLabels": [
+              "Used / limit (e.g. 110/500)",
+              "Remaining (e.g. 390 left)"
+            ],
+            "enumDescriptions": [
+              "Show used and limit (e.g. 110/500).",
+              "Show requests remaining (e.g. 390 left)."
+            ],
+            "default": "usedLimit",
+            "order": 1,
+            "description": "How plan request quota is shown in the status bar."
+          },
+          "cursorUsage.statusBar.fillStyle": {
+            "type": "string",
+            "enum": [
+              "dots",
+              "blocks",
+              "squares",
+              "stars",
+              "bars",
+              "none"
+            ],
+            "enumItemLabels": [
+              "Dots (●○○○○)",
+              "Blocks (█░░░░)",
+              "Squares (■□□□□)",
+              "Stars (★☆☆☆☆)",
+              "Bars (▮▯▯▯▯)",
+              "None"
+            ],
+            "enumDescriptions": [
+              "Filled and empty circles (●○○○○).",
+              "Block bar (█░░░░).",
+              "Filled and empty squares (■□□□□).",
+              "Filled and empty stars (★☆☆☆☆).",
+              "Vertical bars (▮▯▯▯▯).",
+              "No fill indicator — numbers only."
+            ],
+            "default": "dots",
+            "order": 2,
+            "description": "Visual fill indicator next to the quota figure."
+          }
+        }
+      },
+      {
+        "title": "Quota Alerts",
+        "order": 4,
+        "properties": {
+          "cursorUsage.statusBar.warnAtPercent": {
+            "type": "number",
+            "default": 80,
+            "minimum": 1,
+            "maximum": 99,
+            "order": 1,
+            "description": "Turn the status bar yellow once this % of included requests is used."
+          },
+          "cursorUsage.statusBar.criticalAtPercent": {
+            "type": "number",
+            "default": 95,
+            "minimum": 1,
+            "maximum": 200,
+            "order": 2,
+            "description": "Turn the status bar red once this % of included requests is used."
+          }
         }
       }
-    }
+    ]
   },
   "scripts": {
     "compile": "tsc --noEmit && node esbuild.js",
     "watch": "node esbuild.js --watch",
+    "lint": "eslint src --ext .ts,.js",
     "test": "node test/run-tests.mjs",
     "package": "npm run compile && vsce package"
   },
@@ -137,8 +257,11 @@
     "@types/node": "^18.19.0",
     "@types/sql.js": "^1.4.9",
     "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "@vscode/vsce": "^2.24.0",
     "esbuild": "^0.20.0",
+    "eslint": "^8.57.0",
     "typescript": "^5.3.0"
   }
 }
