@@ -6,6 +6,8 @@
 [![Downloads](https://img.shields.io/open-vsx/dt/iair0007/cursor-usage-dashboard)](https://open-vsx.org/extension/iair0007/cursor-usage-dashboard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/iair0007/cursor-usage/blob/main/LICENSE)
 
+**Website:** [iair0007.github.io/cursor-usage](https://iair0007.github.io/cursor-usage/)
+
 Costs, cache savings, model breakdowns, rule-based insights, and a cost simulator — with zero setup. No proxy server, no login: it reuses the session Cursor created when you signed in.
 
 ![Overview tab](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-overview.png)

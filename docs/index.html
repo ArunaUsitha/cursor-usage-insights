@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cursor Usage Dashboard</title>
+<meta name="description" content="Track your remaining Cursor requests and spend, right inside Cursor. Status bar quota gauge, cost dashboard, cache savings, model breakdown, cost simulator.">
+<link rel="icon" href="../resources/icon.png">
+<style>
+  :root {
+    --bg: #0f1720;
+    --bg-alt: #141e28;
+    --panel: #182430;
+    --border: #253340;
+    --text: #e7edf2;
+    --text-dim: #9fb0bd;
+    --accent: #5ec1a8;
+    --accent-dim: #3d8d7a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  img { max-width: 100%; display: block; }
+
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+
+  header.hero {
+    padding: 72px 0 48px;
+    text-align: center;
+  }
+  .icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 18px;
+    margin-bottom: 20px;
+  }
+  h1 {
+    font-size: 2.1rem;
+    margin: 0 0 12px;
+    letter-spacing: -0.02em;
+  }
+  .tagline {
+    font-size: 1.15rem;
+    color: var(--text-dim);
+    max-width: 560px;
+    margin: 0 auto 28px;
+  }
+  .badges {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+  .badges img { height: 20px; }
+
+  .cta-row {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-block;
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0b1310;
+  }
+  .btn-primary:hover { background: #79cdb6; text-decoration: none; }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--accent); text-decoration: none; }
+
+  .hero-shot {
+    margin: 48px 0 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.6);
+  }
+
+  section {
+    padding: 56px 0;
+    border-top: 1px solid var(--border);
+  }
+  section h2 {
+    font-size: 1.4rem;
+    margin: 0 0 8px;
+  }
+  section > p.lead {
+    color: var(--text-dim);
+    margin: 0 0 32px;
+    max-width: 620px;
+  }
+
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 16px;
+  }
+  .steps li {
+    counter-increment: step;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px 16px 52px;
+    position: relative;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 16px;
+    top: 16px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: #eafff8;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  .feature-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .feature-card img { display: block; }
+  .feature-card .body { padding: 16px 18px 20px; }
+  .feature-card h3 { margin: 0 0 6px; font-size: 1rem; }
+  .feature-card p { margin: 0; color: var(--text-dim); font-size: 0.92rem; }
+
+  @media (max-width: 640px) {
+    .feature-grid { grid-template-columns: 1fr; }
+    header.hero { padding: 48px 0 32px; }
+    h1 { font-size: 1.7rem; }
+  }
+
+  footer {
+    padding: 40px 0 64px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.88rem;
+  }
+  footer a { color: var(--text-dim); }
+  footer .links { margin-bottom: 10px; }
+  footer .links a { margin: 0 10px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="hero">
+    <img class="icon" src="../resources/icon.png" alt="Cursor Usage Dashboard icon">
+    <h1>Cursor Usage Dashboard</h1>
+    <p class="tagline">See exactly where your Cursor requests and tokens go — right inside Cursor. Cost dashboard, cache savings, model breakdown, and a cost simulator. No proxy, no login.</p>
+
+    <div class="badges">
+      <img src="https://img.shields.io/open-vsx/v/iair0007/cursor-usage-dashboard?label=Open%20VSX" alt="Open VSX version">
+      <img src="https://img.shields.io/open-vsx/dt/iair0007/cursor-usage-dashboard" alt="Open VSX downloads">
+      <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License">
+    </div>
+
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://open-vsx.org/extension/iair0007/cursor-usage-dashboard">Install from Open VSX</a>
+      <a class="btn btn-secondary" href="https://github.com/iair0007/cursor-usage">View on GitHub</a>
+    </div>
+
+    <div class="hero-shot">
+      <img src="screenshot-overview.png" alt="Cursor Usage Dashboard overview tab">
+    </div>
+  </header>
+
+  <section id="install">
+    <h2>Install</h2>
+    <p class="lead">Published on the <a href="https://open-vsx.org/extension/iair0007/cursor-usage-dashboard">Open VSX Registry</a> — the registry Cursor's Extensions view searches.</p>
+    <ol class="steps">
+      <li>Open the Extensions view in Cursor (<code>Ctrl+Shift+X</code> / <code>Cmd+Shift+X</code>).</li>
+      <li>Search for <strong>"Cursor Usage Dashboard"</strong> and click <strong>Install</strong>.</li>
+      <li>Run <strong>Cursor Usage: Open Dashboard</strong> from the command palette — that's it.</li>
+    </ol>
+  </section>
+
+  <section id="features">
+    <h2>What's inside</h2>
+    <p class="lead">Four tabs, from simple to detailed.</p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <img src="screenshot-statusbar.png" alt="Status bar quota gauge">
+        <div class="body">
+          <h3>Status bar</h3>
+          <p>A live usage figure that turns yellow at 80% and red at 95% of your quota, with a burn-rate projection.</p>
+        </div>
+      </div>
+      <div class="feature-card">
+        <img src="screenshot-requests.png" alt="Requests tab">
+        <div class="body">
+          <h3>Requests</h3>
+          <p>The full request log with cost, cache savings, model filters, and CSV export.</p>
+        </div>
+      </div>
+      <div class="feature-card">
+        <img src="screenshot-analyze.png" alt="Analyze tab">
+        <div class="body">
+          <h3>Analyze</h3>
+          <p>Rule-based findings — which model dominates your spend, cache efficiency, spike requests — each with a concrete fix.</p>
+        </div>
+      </div>
+      <div class="feature-card">
+        <img src="screenshot-simulator.png" alt="Simulator tab">
+        <div class="body">
+          <h3>Simulator</h3>
+          <p>Replay any request's token profile against other models' published rates.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="privacy">
+    <h2>Privacy</h2>
+    <p class="lead">Everything runs locally. The only network calls are to cursor.com — no proxy server, no separate login. The extension reads the session Cursor already created when you signed in. See the <a href="https://github.com/iair0007/cursor-usage#authentication--privacy">README</a> for the full auth model.</p>
+  </section>
+
+  <footer>
+    <div class="links">
+      <a href="https://open-vsx.org/extension/iair0007/cursor-usage-dashboard">Open VSX</a>
+      <a href="https://github.com/iair0007/cursor-usage">GitHub</a>
+      <a href="https://github.com/iair0007/cursor-usage/issues">Issues</a>
+      <a href="https://github.com/iair0007/cursor-usage/blob/main/LICENSE">MIT License</a>
+    </div>
+    <div>Cursor Usage Dashboard is an independent, MIT-licensed project — not affiliated with Anysphere or Cursor.</div>
+  </footer>
+</div>
+
+</body>
+</html>
