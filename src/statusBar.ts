@@ -18,12 +18,12 @@ import {
 type CostMode = 'value' | 'billed';
 
 function statusBarTooltipFooter(tooltip: vscode.MarkdownString): void {
-  tooltip.isTrusted = true;
-  tooltip.appendMarkdown(`\n_Click to open the dashboard · [Settings](command:cursorUsage.openSettings)_`);
+  tooltip.appendMarkdown(`\n_Click to open the dashboard — use the gear icon for settings_`);
 }
 
 export class UsageStatusBar {
   private item: vscode.StatusBarItem;
+  private settingsItem: vscode.StatusBarItem;
   private timer: NodeJS.Timeout | undefined;
   private disposables: vscode.Disposable[] = [];
 
@@ -35,6 +35,14 @@ export class UsageStatusBar {
     loadingTooltip.appendMarkdown('Cursor Usage: loading…');
     statusBarTooltipFooter(loadingTooltip);
     this.item.tooltip = loadingTooltip;
+
+    // A dedicated status bar item for Settings, rather than a `command:` link
+    // inside the main item's hover tooltip — clicking a command link while the
+    // hover widget is still open has been observed to crash Cursor.
+    this.settingsItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+    this.settingsItem.command = 'cursorUsage.openSettings';
+    this.settingsItem.text = '$(gear)';
+    this.settingsItem.tooltip = 'Cursor Usage: Settings';
 
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
@@ -75,9 +83,11 @@ export class UsageStatusBar {
 
     if (!enabled) {
       this.item.hide();
+      this.settingsItem.hide();
       return;
     }
     this.item.show();
+    this.settingsItem.show();
     void this.refresh();
     this.timer = setInterval(() => void this.refresh(), intervalMinutes * 60 * 1000);
   }
@@ -203,6 +213,7 @@ export class UsageStatusBar {
   dispose(): void {
     if (this.timer) clearInterval(this.timer);
     this.item.dispose();
+    this.settingsItem.dispose();
     while (this.disposables.length) this.disposables.pop()?.dispose();
   }
 }

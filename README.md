@@ -22,7 +22,7 @@ The extension is published on the [Open VSX Registry](https://open-vsx.org/exten
 
 ## Always-on status bar
 
-A live usage figure sits in your status bar and updates automatically. Click it to open the dashboard.
+A live usage figure sits in your status bar and updates automatically. Click it to open the dashboard, or click the gear icon next to it to open settings.
 
 ![Status bar states](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-statusbar.png)
 
