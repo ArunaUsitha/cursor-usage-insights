@@ -18,8 +18,7 @@ import {
 type CostMode = 'value' | 'billed';
 
 function statusBarTooltipFooter(tooltip: vscode.MarkdownString): void {
-  tooltip.isTrusted = true;
-  tooltip.appendMarkdown(`\n_Click to open the dashboard · [Settings](command:cursorUsage.openSettings)_`);
+  tooltip.appendMarkdown(`\n_Click to open the dashboard_`);
 }
 
 export class UsageStatusBar {
