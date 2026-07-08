@@ -144,7 +144,9 @@ export class UsageStatusBar {
         ? 'Billed cost'
         : `Token ${freePlan ? 'value (what-if, not billed)' : 'cost'}`;
       tooltip.appendMarkdown(`- ${costLabel} (${periodScope}): **$${cost.toFixed(2)}**\n`);
-      tooltip.appendMarkdown(`- Requests (${periodScope}): **${countRequests(result.events).toLocaleString('en-US')}**\n`);
+      if (!hasQuotaLimit) {
+        tooltip.appendMarkdown(`- Requests (${periodScope}): **${countRequests(result.events).toLocaleString('en-US')}**\n`);
+      }
       if (result.plan?.membershipType) tooltip.appendMarkdown(`- Plan: ${result.plan.membershipType}\n`);
       if (quota && hasQuotaLimit) {
         const overLimit = quota.used > quota.limit!;
