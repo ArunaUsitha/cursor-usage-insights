@@ -336,6 +336,8 @@ function getRangeForPreset(preset) {
     start.setDate(start.getDate() - 6);
   } else if (preset === '30d') {
     start.setDate(start.getDate() - 29);
+  } else if (preset === 'mtd') {
+    start.setDate(1);
   } else {
     return null;
   }
@@ -343,7 +345,7 @@ function getRangeForPreset(preset) {
 }
 
 function detectPreset(start, end) {
-  for (const preset of ['today', '7d', '30d']) {
+  for (const preset of ['today', '7d', '30d', 'mtd']) {
     const r = getRangeForPreset(preset);
     if (r.start === start && r.end === end) return preset;
   }
@@ -471,7 +473,7 @@ function sumRows(rows, key) {
 function updateFilterSummary() {
   const modelVal = $('modelFilter').value;
   const modelLabel = modelVal ? displayModel(modelVal) : 'All models';
-  const presetLabels = { today: 'Today', '7d': '7 days', '30d': '30 days', custom: 'Custom' };
+  const presetLabels = { today: 'Today', '7d': '7 days', '30d': '30 days', mtd: 'Month to date', custom: 'Custom' };
   const period = presetLabels[state.datePreset] || 'Custom';
   const parts = [
     period,
@@ -1565,7 +1567,7 @@ function initAnalyzeSidebar() {
 
 function buildBriefSectionSummary(data, events) {
   const { summary } = data;
-  const presetLabels = { today: 'Today', '7d': '7 days', '30d': '30 days', custom: 'Custom' };
+  const presetLabels = { today: 'Today', '7d': '7 days', '30d': '30 days', mtd: 'Month to date', custom: 'Custom' };
   const lines = [
     `- Period: ${presetLabels[state.datePreset] || 'Custom'} (${$('startDate').value} to ${$('endDate').value})`,
     `- Requests: ${summary.count}${summary.notCounted > 0 ? ` (+${summary.notCounted} errored/aborted events excluded)` : ''}${events.length < state.all.length ? ` (filtered from ${state.all.length} loaded)` : ''}`,
