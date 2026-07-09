@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cursor Insights — UI Preview</title>
+  <link rel="stylesheet" href="media/styles.css" />
+  <style>
+    /* Simulate VS Code dark theme variables — Hynex palette */
+    :root {
+      --vscode-editor-background: #0d1117;
+      --vscode-editor-foreground: #f0f4f8;
+      --vscode-editorWidget-background: rgba(22,31,45,0.85);
+      --vscode-editorWidget-border: rgba(255,255,255,0.07);
+      --vscode-sideBar-background: #0d1117;
+      --vscode-descriptionForeground: #5a6a80;
+      --vscode-textLink-foreground: #00d4ff;
+      --vscode-button-foreground: #0d1117;
+      --vscode-button-background: #00d4ff;
+      --vscode-button-secondaryBackground: rgba(255,255,255,0.06);
+      --vscode-button-secondaryForeground: #f0f4f8;
+      --vscode-input-background: rgba(255,255,255,0.05);
+      --vscode-input-foreground: #f0f4f8;
+      --vscode-input-border: rgba(255,255,255,0.1);
+      --vscode-list-hoverBackground: rgba(0,212,255,0.04);
+      --vscode-focusBorder: #00d4ff;
+      --vscode-font-family: 'Inter', system-ui, sans-serif;
+      --vscode-editorHoverWidget-background: #161d2b;
+      --vscode-editorHoverWidget-foreground: #f0f4f8;
+      --vscode-editorHoverWidget-border: rgba(255,255,255,0.18);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header-top">
+        <div class="brand">
+          <h1>Cursor Insights</h1>
+          <p id="authLabel">Signed in as you@example.com (personal)</p>
+          <p class="footer-links">
+            <a href="#">Official usage dashboard ↗</a>
+            <span>·</span>
+            <a href="#">Model pricing ↗</a>
+          </p>
+        </div>
+        <nav class="app-nav" aria-label="Main">
+          <button type="button" class="nav-item active">Overview</button>
+          <button type="button" class="nav-item">Requests</button>
+          <button type="button" class="nav-item">Analyze</button>
+          <button type="button" class="nav-item">Simulator</button>
+        </nav>
+      </div>
+
+      <div class="filter-bar">
+        <div class="filter-main">
+          <div class="date-presets">
+            <span class="presets-label">Period</span>
+            <button type="button" class="preset-btn">Today</button>
+            <button type="button" class="preset-btn">7 days</button>
+            <button type="button" class="preset-btn active">30 days</button>
+            <button type="button" class="preset-btn">Month to date</button>
+            <button type="button" class="preset-btn">Custom</button>
+          </div>
+          <div class="filter-fields">
+            <label><span>From</span><input type="date" value="2026-06-09" /></label>
+            <label><span>To</span><input type="date" value="2026-07-09" /></label>
+            <label><span>Model</span>
+              <select>
+                <option>All models</option>
+                <option>claude-sonnet-4-5</option>
+                <option>gpt-4o</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="filter-actions">
+          <span class="filter-summary">1,247 requests · Jun 9 – Jul 9</span>
+          <div class="date-presets">
+            <span class="presets-label">Costs <span class="tip" data-tip="What-if: API-equivalent token value. Billed: what your plan actually charged.">ⓘ</span></span>
+            <button type="button" class="preset-btn active">What-if</button>
+            <button type="button" class="preset-btn">Billed</button>
+          </div>
+          <button class="btn primary">Refresh</button>
+          <button class="btn">Export CSV</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="alert info">ℹ️ Prices fetched from cursor.com/docs/models-and-pricing · Last updated Jul 9 2026</div>
+
+    <!-- OVERVIEW -->
+    <section id="overviewView">
+      <section class="plan-cycle" aria-label="Plan and billing cycle">
+        <div class="plan-cycle-top">
+          <div class="plan-cycle-identity">
+            <svg class="plan-cycle-ring" viewBox="0 0 36 36" width="36" height="36">
+              <circle class="ring-track" cx="18" cy="18" r="15.5" />
+              <circle class="ring-fill" cx="18" cy="18" r="15.5" style="stroke-dashoffset:42;" />
+            </svg>
+            <div>
+              <span class="plan-cycle-eyebrow">Your plan</span>
+              <h2>Pro · 500 requests/mo</h2>
+            </div>
+          </div>
+          <div class="plan-cycle-reset">Resets Aug 1 · 23 days left</div>
+        </div>
+        <div class="plan-cycle-bar-row">
+          <div class="plan-cycle-bar-track">
+            <div class="plan-cycle-bar-fill" style="width:56%;"></div>
+          </div>
+          <span class="plan-cycle-bar-label">280 / 500</span>
+        </div>
+        <p class="plan-cycle-note">At this pace you'll use ~380 of your 500 requests by reset. On-demand billing kicks in after that.</p>
+      </section>
+
+      <div class="ov-toolbar">
+        <div class="date-presets">
+          <button type="button" class="preset-btn">Today</button>
+          <button type="button" class="preset-btn">7 days</button>
+          <button type="button" class="preset-btn active">30 days</button>
+          <button type="button" class="preset-btn">Month to date</button>
+        </div>
+        <div class="date-presets">
+          <button type="button" class="preset-btn active">What-if</button>
+          <button type="button" class="preset-btn">Billed</button>
+        </div>
+      </div>
+
+      <div class="ov-stats">
+        <article class="ov-stat ov-stat-primary">
+          <span class="ov-stat-label">Token cost</span>
+          <span class="ov-stat-value">$4.83</span>
+          <span class="ov-stat-sub">$0.16/day avg · trending up</span>
+        </article>
+        <article class="ov-stat">
+          <span class="ov-stat-label">Requests</span>
+          <span class="ov-stat-value">1,247</span>
+          <span class="ov-stat-sub">41.6/day avg</span>
+        </article>
+        <article class="ov-stat">
+          <span class="ov-stat-label">Cache savings</span>
+          <span class="ov-stat-value ov-stat-green">$2.14</span>
+          <span class="ov-stat-sub">30.7% effective cache rate</span>
+        </article>
+      </div>
+
+      <div class="ov-lower">
+        <article class="panel ov-trend-panel">
+          <div class="ov-trend-head">
+            <h3>Daily spend</h3>
+            <span class="panel-desc">Jun 9 – Jul 9</span>
+          </div>
+          <div class="ov-sparkline-box" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">
+            [ Chart renders in live extension ]
+          </div>
+        </article>
+        <article class="panel ov-insight-panel">
+          <h3>Worth knowing</h3>
+          <div class="finding-card severity-medium ov-insight-card">
+            <h4>claude-sonnet-4-5 dominates spend</h4>
+            <p>67% of your token cost comes from one model. Switching lighter tasks to a cheaper model could cut costs significantly.</p>
+            <span class="finding-action">→ View model breakdown</span>
+          </div>
+          <button type="button" class="btn-link-inline">See all insights →</button>
+        </article>
+      </div>
+
+      <button type="button" class="btn ov-details-btn">View full request log &amp; charts →</button>
+    </section>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:32px 0 24px;" />
+
+    <!-- KPI STRIP (Requests tab) -->
+    <h3 style="margin-bottom:12px;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);">Requests tab — KPI strip</h3>
+    <section class="kpi-strip">
+      <article class="kpi">
+        <span class="kpi-label">Requests <span class="tip" data-tip="Number of API requests in the filtered period.">ⓘ</span></span>
+        <span class="kpi-value">1,247</span>
+        <span class="kpi-sub">vs 1,093 prior period</span>
+      </article>
+      <article class="kpi kpi-primary">
+        <span class="kpi-label">Token cost <span class="tip" data-tip="Sum of model/API token charges from Cursor.">ⓘ</span></span>
+        <span class="kpi-value">$4.83</span>
+        <span class="kpi-sub">$0.16/day avg</span>
+        <span class="kpi-sub kpi-fees">+ $0.22 usage fees</span>
+      </article>
+      <article class="kpi kpi-green">
+        <span class="kpi-label">Cache savings <span class="tip" data-tip="Estimated savings using cache-read tokens vs full input rate.">ⓘ</span></span>
+        <span class="kpi-value">$2.14</span>
+        <span class="kpi-sub">30.7% cache rate</span>
+      </article>
+      <article class="kpi">
+        <span class="kpi-label">Avg token cost / req <span class="tip" data-tip="Average cost per request with cache savings applied.">ⓘ</span></span>
+        <span class="kpi-value">$0.0039</span>
+        <span class="kpi-sub">$0.0071 without cache</span>
+      </article>
+    </section>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:32px 0 24px;" />
+
+    <!-- TABLE PANEL -->
+    <h3 style="margin-bottom:12px;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);">Request log</h3>
+    <section class="panel table-panel">
+      <div class="table-head">
+        <div>
+          <h3>Request log</h3>
+          <p class="table-desc">Token cost per request. Hover ⓘ on column headers for help.</p>
+        </div>
+        <div class="table-controls">
+          <label class="inline-label">Rows
+            <select><option>25</option><option>50</option><option>100</option></select>
+          </label>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="time" class="sorted-desc">Time</th>
+              <th>Model</th>
+              <th>Token cost</th>
+              <th>Cache saved</th>
+              <th>Input</th>
+              <th>Output</th>
+              <th>Cache read</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Jul 9, 14:52</td>
+              <td>claude-sonnet-4-5</td>
+              <td class="cost">$0.0082</td>
+              <td class="savings">$0.0031</td>
+              <td class="tokens">8,450</td>
+              <td class="tokens">1,203</td>
+              <td class="tokens">24,100</td>
+              <td class="tokens">33,753</td>
+            </tr>
+            <tr class="expensive">
+              <td>Jul 9, 13:17</td>
+              <td>claude-sonnet-4-5</td>
+              <td class="cost">$0.0341</td>
+              <td class="savings">$0.0089</td>
+              <td class="tokens">42,300</td>
+              <td class="tokens">3,812</td>
+              <td class="tokens">61,500</td>
+              <td class="tokens">107,612</td>
+            </tr>
+            <tr>
+              <td>Jul 9, 11:44</td>
+              <td>gpt-4o</td>
+              <td class="cost">$0.0019</td>
+              <td class="savings">$0.0000</td>
+              <td class="tokens">2,100</td>
+              <td class="tokens">412</td>
+              <td class="tokens">0</td>
+              <td class="tokens">2,512</td>
+            </tr>
+            <tr>
+              <td>Jul 9, 10:03</td>
+              <td>Auto</td>
+              <td class="cost">$0.0044</td>
+              <td class="savings">$0.0012</td>
+              <td class="tokens">5,900</td>
+              <td class="tokens">873</td>
+              <td class="tokens">14,200</td>
+              <td class="tokens">20,973</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2">4 of 1,247 requests shown</td>
+              <td class="cost">$0.0486</td>
+              <td class="savings">$0.0132</td>
+              <td>58,750</td>
+              <td>6,300</td>
+              <td>99,800</td>
+              <td>164,850</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="pagination">
+        <button class="btn" disabled>Previous</button>
+        <span>Page 1 of 50</span>
+        <button class="btn">Next</button>
+      </div>
+    </section>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:32px 0 24px;" />
+
+    <!-- FINDING CARDS -->
+    <h3 style="margin-bottom:12px;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);">Analyze — finding cards</h3>
+    <div class="analyze-cards" style="margin-bottom:24px;">
+      <div class="finding-card severity-high">
+        <h4>Cold starts detected</h4>
+        <p>14 requests had zero cache-read tokens despite large inputs. Structuring prompts with stable prefixes can warm the cache.</p>
+        <span class="finding-action">→ What to do about it</span>
+      </div>
+      <div class="finding-card severity-medium">
+        <h4>Heavy output requests</h4>
+        <p>23 requests produced over 4k output tokens. These are 4× more expensive per token than input. Consider streaming and shorter responses.</p>
+        <span class="finding-action">→ See the requests</span>
+      </div>
+      <div class="finding-card severity-positive">
+        <h4>Cache is working well</h4>
+        <p>Your 30.7% cache hit rate is above the median. You're saving ~$2.14 this period that would otherwise be billed at full input rates.</p>
+        <span class="finding-action">→ Cache breakdown</span>
+      </div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:32px 0 24px;" />
+
+    <!-- SIMULATOR RESULT CARDS -->
+    <h3 style="margin-bottom:12px;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);">Simulator — result cards</h3>
+    <div class="sim-results" style="max-width:380px;margin-bottom:32px;">
+      <div class="sim-result-card">
+        <span class="sim-result-label">Estimated token cost</span>
+        <span class="sim-result-value">$0.0341</span>
+      </div>
+      <div class="sim-result-card sim-green">
+        <span class="sim-result-label">Cache savings</span>
+        <span class="sim-result-value">$0.0089</span>
+      </div>
+      <div class="sim-result-card">
+        <span class="sim-result-label">Cost without cache</span>
+        <span class="sim-result-value">$0.0430</span>
+      </div>
+      <p class="sim-rates">Rates: input $3/M · output $15/M · cache read $0.30/M</p>
+    </div>
+
+    <!-- ALERTS -->
+    <h3 style="margin-bottom:12px;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);">Alert states</h3>
+    <div class="alert info" style="margin-bottom:8px;">ℹ️ This is an info alert — used for billing notices and tips.</div>
+    <div class="alert warn" style="margin-bottom:8px;">⚠️ Warning alert — quota at 80%, getting close.</div>
+    <div class="alert error">🚨 Error alert — could not reach cursor.com. Retrying…</div>
+
+  </div>
+</body>
+</html>
