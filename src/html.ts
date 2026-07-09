@@ -24,7 +24,7 @@ export function getDashboardHtml(webview: vscode.Webview, extensionUri: vscode.U
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${n}'; img-src ${webview.cspSource} data:; font-src ${webview.cspSource};" />
+        content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline' https://fonts.googleapis.com; script-src 'nonce-${n}'; img-src ${webview.cspSource} data:; font-src ${webview.cspSource} https://fonts.gstatic.com;" />
   <title>Cursor Usage Dashboard</title>
   <link rel="stylesheet" href="${styles}" />
 </head>
