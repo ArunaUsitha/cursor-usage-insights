@@ -1,18 +1,18 @@
 {
-  "name": "cursor-usage-dashboard",
-  "displayName": "Cursor Usage Dashboard",
+  "name": "cursor-usage-insights",
+  "displayName": "Cursor Insights",
   "description": "Track your remaining Cursor requests and spend: status bar quota gauge, cost dashboard, cache savings, model breakdown, cost simulator.",
   "version": "0.4.3",
-  "publisher": "iair0007",
+  "publisher": "ArunaUsitha",
   "license": "MIT",
   "icon": "resources/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/iair0007/cursor-usage"
+    "url": "https://github.com/ArunaUsitha/cursor-usage-insights"
   },
-  "homepage": "https://iair0007.github.io/cursor-usage/",
+  "homepage": "https://ArunaUsitha.github.io/cursor-usage-insights/",
   "bugs": {
-    "url": "https://github.com/iair0007/cursor-usage/issues"
+    "url": "https://github.com/ArunaUsitha/cursor-usage-insights/issues"
   },
   "engines": {
     "vscode": "^1.85.0"

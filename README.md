@@ -1,30 +1,30 @@
-# Cursor Usage Dashboard
+# Cursor Insights
 
 **See exactly where your Cursor requests and tokens go — right inside Cursor.**
 
-[![Open VSX](https://img.shields.io/open-vsx/v/iair0007/cursor-usage-dashboard?label=Open%20VSX)](https://open-vsx.org/extension/iair0007/cursor-usage-dashboard)
-[![Downloads](https://img.shields.io/open-vsx/dt/iair0007/cursor-usage-dashboard)](https://open-vsx.org/extension/iair0007/cursor-usage-dashboard)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/iair0007/cursor-usage/blob/main/LICENSE)
+[![Open VSX](https://img.shields.io/open-vsx/v/ArunaUsitha/cursor-usage-insights?label=Open%20VSX)](https://open-vsx.org/extension/ArunaUsitha/cursor-usage-insights)
+[![Downloads](https://img.shields.io/open-vsx/dt/ArunaUsitha/cursor-usage-insights)](https://open-vsx.org/extension/ArunaUsitha/cursor-usage-insights)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/ArunaUsitha/cursor-usage-insights/blob/main/LICENSE)
 
-**Website:** [iair0007.github.io/cursor-usage](https://iair0007.github.io/cursor-usage/)
+**Website:** [ArunaUsitha.github.io/cursor-usage-insights](https://ArunaUsitha.github.io/cursor-usage-insights/)
 
 Costs, cache savings, model breakdowns, rule-based insights, and a cost simulator — with zero setup. No proxy server, no login: it reuses the session Cursor created when you signed in.
 
-![Overview tab](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-overview.png)
+![Overview tab](https://raw.githubusercontent.com/ArunaUsitha/cursor-usage-insights/main/docs/screenshot-overview.png)
 
 ## Install
 
 1. Open the Extensions view in Cursor (`Ctrl+Shift+X` / `Cmd+Shift+X`).
-2. Search for **"Cursor Usage Dashboard"** and click **Install**.
+2. Search for **"Cursor Insights"** and click **Install**.
 3. Run **`Cursor Usage: Open Dashboard`** from the command palette — that's it.
 
-The extension is published on the [Open VSX Registry](https://open-vsx.org/extension/iair0007/cursor-usage-dashboard), which is what Cursor's Extensions view searches.
+The extension is published on the [Open VSX Registry](https://open-vsx.org/extension/ArunaUsitha/cursor-usage-insights), which is what Cursor's Extensions view searches.
 
 ## Always-on status bar
 
 A live usage figure sits in your status bar and updates automatically. Click it to open the dashboard.
 
-![Status bar states](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-statusbar.png)
+![Status bar states](https://raw.githubusercontent.com/ArunaUsitha/cursor-usage-insights/main/docs/screenshot-statusbar.png)
 
 - **On plans with included requests** (e.g. 500/month) it shows **requests used vs. your limit** — `110/500` — because that's the number you actually watch on those plans.
 - It turns **yellow at 80%** and **red at 95%** of your quota (both thresholds configurable), and the tooltip projects when you'll run out at your current pace.
@@ -41,21 +41,21 @@ Your plan and billing-cycle status with a progress bar and burn-rate projection,
 
 ### Requests
 
-![Requests tab](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-requests.png)
+![Requests tab](https://raw.githubusercontent.com/ArunaUsitha/cursor-usage-insights/main/docs/screenshot-requests.png)
 
 The full request log: custom date ranges, model filter, per-request token cost and cache savings, expensive-request highlighting, sortable columns, CSV export. The **Analytics** sub-tab adds daily token cost, cost by model, and token volume charts with a week-over-week trend badge.
 
-![Analytics charts](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-analytics.png)
+![Analytics charts](https://raw.githubusercontent.com/ArunaUsitha/cursor-usage-insights/main/docs/screenshot-analytics.png)
 
 ### Analyze
 
-![Analyze tab](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-analyze.png)
+![Analyze tab](https://raw.githubusercontent.com/ArunaUsitha/cursor-usage-insights/main/docs/screenshot-analyze.png)
 
 Rule-based findings with configurable thresholds: which model dominates your spend, whether your cache is working, cold starts, heavy-output requests, spike requests — each with a concrete "what to do about it". The **Ask Cursor Chat** panel builds a compact brief from the data slices you pick, copies it, and focuses Cursor's chat so you just paste and send.
 
 ### Simulator
 
-![Simulator tab](https://raw.githubusercontent.com/iair0007/cursor-usage/main/docs/screenshot-simulator.png)
+![Simulator tab](https://raw.githubusercontent.com/ArunaUsitha/cursor-usage-insights/main/docs/screenshot-simulator.png)
 
 Replay any real request's token profile against other models' published rates — *"what would this request have cost on Haiku?"* — or price a custom token profile from scratch.
 
@@ -105,7 +105,7 @@ Secrets are stored in VS Code SecretStorage (your OS keychain), never in setting
 
 ## Contributing
 
-Issues and PRs are welcome at [iair0007/cursor-usage](https://github.com/iair0007/cursor-usage).
+Issues and PRs are welcome at [ArunaUsitha/cursor-usage-insights](https://github.com/ArunaUsitha/cursor-usage-insights).
 
 ```bash
 npm install
@@ -117,8 +117,8 @@ npm run package   # build a local .vsix (Extensions: Install from VSIX…)
 
 Layout: `src/extension.ts` (activation), `src/auth.ts` + `src/authCore.ts` (session resolution), `src/api.ts` (cursor.com client), `src/service.ts` (shared data layer), `src/panel.ts` + `src/html.ts` (webview + RPC bridge), `src/statusBar.ts`, `src/webview/` (dashboard UI).
 
-Releases are automated: bumping `version` in `package.json` on `main` triggers the [publish workflow](https://github.com/iair0007/cursor-usage/blob/main/.github/workflows/publish.yml), which builds the `.vsix` and publishes it to Open VSX.
+Releases are automated: bumping `version` in `package.json` on `main` triggers the [publish workflow](https://github.com/ArunaUsitha/cursor-usage-insights/blob/main/.github/workflows/publish.yml), which builds the `.vsix` and publishes it to Open VSX.
 
 ## License
 
-[MIT](https://github.com/iair0007/cursor-usage/blob/main/LICENSE)
+[MIT](https://github.com/ArunaUsitha/cursor-usage-insights/blob/main/LICENSE)

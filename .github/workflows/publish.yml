@@ -36,7 +36,7 @@ jobs:
         id: version
         run: |
           local=$(node -p "require('./package.json').version")
-          published=$(curl -fsSL https://open-vsx.org/api/iair0007/cursor-usage-dashboard | jq -r '.version' || echo "none")
+          published=$(curl -fsSL https://open-vsx.org/api/ArunaUsitha/cursor-usage-insights | jq -r '.version' || echo "none")
           echo "local=$local" >> "$GITHUB_OUTPUT"
           echo "published=$published" >> "$GITHUB_OUTPUT"
           echo "Local: $local — published on Open VSX: $published"
